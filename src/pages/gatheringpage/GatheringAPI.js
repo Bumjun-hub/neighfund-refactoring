@@ -18,37 +18,26 @@ const formDataOptions = {
 class GatheringAPI {
   // 소모임 목록 조회 (인증 불필요)
   async getGatheringList() {
-    try {
-      const response = await fetch(`${API_BASE_URL}/gatherings/free/list`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: { 
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        console.warn(`소모임 목록 조회 실패: ${response.status} ${response.statusText}`);
-        
-        if (response.status === 401) {
-          console.log('로그인하지 않은 사용자 - 빈 목록 반환');
-        } else if (response.status === 403) {
-          console.log('접근 권한 없음 - 빈 목록 반환');
-        } else if (response.status === 404) {
-          console.log('API 엔드포인트를 찾을 수 없음');
-        }
-        
-        return []; // 모든 에러에 대해 빈 배열 반환
+    const response = await fetch(`${API_BASE_URL}/gatherings/free/list`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
       }
+    });
 
-      const data = await response.json();
-      console.log('소모임 목록 조회 성공:', data?.length || 0, '개');
-      return data || [];
-      
-    } catch (error) {
-      console.warn('네트워크 에러 또는 기타 문제:', error.message);
-      return []; // 네트워크 에러 등의 경우에도 빈 배열 반환
+    if (!response.ok) {
+      // 호출부에서 로딩/에러/빈목록을 분리 처리할 수 있게 실패를 그대로 전달
+      throw new Error(`소모임 목록 조회 실패 (${response.status})`);
     }
+
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      throw new Error('소모임 목록 응답 형식이 올바르지 않습니다.');
+    }
+
+    console.log('소모임 목록 조회 성공:', data.length, '개');
+    return data;
   }
 
   // 소모임 상세 조회 (인증된 사용자는 authenticatedFetch, 비인증 사용자는 일반 fetch)

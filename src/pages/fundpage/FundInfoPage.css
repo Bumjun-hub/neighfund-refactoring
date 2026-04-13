@@ -451,3 +451,50 @@
     width: 100%;
   }
 }
+
+/* 펀딩 상세: 단건 조회 로딩·오류·없음 */
+.fund-fetch-status {
+  text-align: center;
+  padding: 48px 24px;
+  max-width: 480px;
+  margin: 40px auto;
+  border-radius: 12px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.fund-fetch-status--loading {
+  color: #555;
+}
+
+.fund-fetch-status--error {
+  background: #fff5f5;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+}
+
+.fund-fetch-status--not-found {
+  color: #666;
+}
+
+.fund-fetch-retry-btn {
+  margin-top: 16px;
+  padding: 10px 20px;
+  font-size: 15px;
+  border: none;
+  border-radius: 8px;
+  background: #2196f3;
+  color: #fff;
+  cursor: pointer;
+}
+
+.fund-fetch-retry-btn:hover {
+  background: #1976d2;
+}
+
+.fund-orders-warning {
+  text-align: center;
+  font-size: 14px;
+  color: #c62828;
+  margin: -8px 0 16px;
+}

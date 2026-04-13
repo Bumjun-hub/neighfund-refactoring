@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import FundParticipateBankStep from "./FundParticipateBankStep";
 import FundParticipateInfoStep from "./FundParticipateInfoStep";
 import FundParticipateNoticeStep from "./FundParticipateNoticeStep";
@@ -17,15 +17,57 @@ const FundParticipatePage = ({ fundId, optionId, rewardTitle, rewardAmount }) =>
     rewardTitle: rewardTitle || "",
   });
   const [fund, setFund] = useState(null);
+  // 모달 안에서 펀딩 단건을 불러올 때: 로딩 / 실패 / 성공을 분리해 무한 "로딩중"과 구분
+  const [loadState, setLoadState] = useState("loading"); // loading | error | ready
 
-  useEffect(() => {
-    if (!fundId || isNaN(fundId)) return;
-    fetch(`/api/fund/view/${fundId}`)
-      .then(res => res.json())
-      .then(data => setFund(data));
+  const loadFund = useCallback(async () => {
+    if (fundId == null || fundId === "" || Number.isNaN(Number(fundId))) {
+      setFund(null);
+      setLoadState("error");
+      return;
+    }
+    setLoadState("loading");
+    setFund(null);
+    try {
+      const res = await fetch(`/api/fund/view/${fundId}`);
+      if (!res.ok) {
+        setLoadState("error");
+        return;
+      }
+      const data = await res.json();
+      if (!data || typeof data !== "object") {
+        setLoadState("error");
+        return;
+      }
+      setFund(data);
+      setLoadState("ready");
+    } catch {
+      setLoadState("error");
+    }
   }, [fundId]);
 
-  if (!fund) return <div>로딩중...</div>;
+  useEffect(() => {
+    loadFund();
+  }, [loadFund]);
+
+  if (loadState === "loading") {
+    return (
+      <div className="participate-status participate-status--loading" role="status">
+        펀딩 정보를 불러오는 중입니다…
+      </div>
+    );
+  }
+
+  if (loadState === "error" || !fund) {
+    return (
+      <div className="participate-status participate-status--error" role="alert">
+        <p>펀딩 정보를 불러오지 못했습니다.</p>
+        <button type="button" className="participate-retry-btn" onClick={loadFund}>
+          다시 시도
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="participate-page">

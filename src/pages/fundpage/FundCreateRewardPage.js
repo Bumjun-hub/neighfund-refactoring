@@ -9,6 +9,8 @@ const FundCreateRewardPage = () => {
   const [rewards, setRewards] = useState([
     { title: '', description: '', amount: '', quantity: '' },
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const { setFundData, fundData } = useFunding();
 
   const handleChange = (index, field, value) => {
@@ -28,6 +30,10 @@ const FundCreateRewardPage = () => {
 
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
+    setSubmitError('');
+    setIsSubmitting(true);
+
     // context에 options 저장
     setFundData((prev) => ({
       ...prev,
@@ -81,14 +87,17 @@ const FundCreateRewardPage = () => {
       });
 
       if (!response.ok) {
-        throw new Error("서버 오류 발생");
+        throw new Error(`서버 오류 발생 (HTTP ${response.status})`);
       }
 
       alert("펀딩 등록 성공!");
       navigate("/funding/")
     } catch (err) {
       console.error("에러:", err);
+      setSubmitError('펀딩 등록에 실패했습니다. 잠시 후 다시 시도해주세요.');
       alert("펀딩 등록 실패");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -140,7 +149,12 @@ const FundCreateRewardPage = () => {
         ))}
 
         <button className="add-btn" onClick={addReward}>+ 리워드 추가</button>
-        <button className="next-btn" disabled={!isValid} onClick={handleSubmit}>제출</button>
+        {submitError && (
+          <p className="fund-create-reward-error" role="alert">{submitError}</p>
+        )}
+        <button className="next-btn" disabled={!isValid || isSubmitting} onClick={handleSubmit}>
+          {isSubmitting ? '제출 중...' : '제출'}
+        </button>
       </div>
     </FundCreateLayout>
   );

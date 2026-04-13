@@ -6,6 +6,8 @@ const SurveyBox = ({ question, options, surveyId, voted, showResult, totalCount,
   const [selected, setSelected] = useState(null);
   const [result, setResult] = useState([]);
   const [totalVotes, setTotalVotes] = useState(totalCount || 0);
+  const [isVoting, setIsVoting] = useState(false);
+  const [voteError, setVoteError] = useState('');
 
   // 이미 투표한 경우 표시
   useEffect(() => {
@@ -21,6 +23,9 @@ const SurveyBox = ({ question, options, surveyId, voted, showResult, totalCount,
   }, [voted, options]);
 
   const handleVote = async (optionIndex) => {
+    if (isVoting || selected !== null || voted) return;
+    setVoteError('');
+    setIsVoting(true);
     try {
       let res = await fetch(`/api/survey/${surveyId}/vote?optionId=${options[optionIndex].optionId}`, {
         method: 'POST',
@@ -70,12 +75,16 @@ const SurveyBox = ({ question, options, surveyId, voted, showResult, totalCount,
       }
       else {
         const msg = await res.text();
+        setVoteError('투표에 실패했습니다. 다시 시도해주세요.');
         alert('투표 실패: ' + msg);
       }
 
     } catch (err) {
       console.error("투표 요청 오류", err);
+      setVoteError('투표 요청 중 오류가 발생했습니다.');
       alert("서버 오류 발생");
+    } finally {
+      setIsVoting(false);
     }
   };
 
@@ -86,7 +95,7 @@ const SurveyBox = ({ question, options, surveyId, voted, showResult, totalCount,
         {options.map((option, index) => (
           <div
             key={index}
-            className={`survey-option ${selected === index ? 'selected' : ''}`}
+            className={`survey-option ${selected === index ? 'selected' : ''} ${isVoting ? 'survey-option-disabled' : ''}`}
             onClick={() => {
               if (selected === null && !voted) handleVote(index);
             }}
@@ -104,6 +113,12 @@ const SurveyBox = ({ question, options, surveyId, voted, showResult, totalCount,
           </div>
         ))}
       </div>
+      {voteError && (
+        <p className="survey-vote-error" role="alert">{voteError}</p>
+      )}
+      {isVoting && (
+        <p className="survey-voting-status" role="status">투표 처리 중...</p>
+      )}
       {(voted || result.length > 0) && (
         <p style={{ fontSize: '13px', textAlign: 'right' }}>
           총 참여자 수: {totalVotes}명

@@ -86,7 +86,7 @@ const Gathering = () => {
     setError(null);
     
     try {
-      // API에서 에러 처리를 모두 담당하므로 간단히 호출
+      // API 성공 시에만 "빈 목록"으로 간주하고, 실패는 error 상태로 분리
       const data = await GatheringAPI.getGatheringList();
       setGatherings(data);
       
@@ -94,9 +94,10 @@ const Gathering = () => {
       setHasMore(data.length >= 10);
       
     } catch (error) {
-      // 이론적으로는 여기까지 오지 않아야 함 (API에서 처리)
-      console.error('예상치 못한 에러:', error);
+      console.error('소모임 목록 로딩 실패:', error);
       setGatherings([]);
+      setError('소모임 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      setHasMore(false);
     } finally {
       setIsLoading(false);
     }

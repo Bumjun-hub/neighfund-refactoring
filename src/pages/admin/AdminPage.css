@@ -28,6 +28,35 @@
   background: #fff;
 }
 
+.admin-status {
+  margin: 12px 0 18px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.admin-status--loading {
+  background: #eef5ff;
+  color: #1f4f8f;
+}
+
+.admin-status--error {
+  background: #fff1f0;
+  border: 1px solid #ffd5d1;
+  color: #8f2d27;
+}
+
+.admin-retry-btn {
+  margin-top: 10px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #2d8cf0;
+  color: #fff;
+  cursor: pointer;
+}
+
 /* 서브 탭 버튼 (승인됨/대기중/전체 등) */
 .tab-buttons {
   margin-bottom: 20px;

@@ -50,6 +50,30 @@
   color: #666;
 }
 
+.vendor-admin-status {
+  max-width: 520px;
+  margin: 20px auto;
+  padding: 18px 20px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.vendor-admin-status--error {
+  background: #fff1f0;
+  border: 1px solid #ffd5d1;
+  color: #8f2d27;
+}
+
+.vendor-admin-retry-btn {
+  margin-top: 10px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #2d8cf0;
+  color: #fff;
+  cursor: pointer;
+}
+
 /* 테이블 공통 스타일 */
 .vendor-admin-table {
   width: 100%;

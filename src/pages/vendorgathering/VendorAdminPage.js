@@ -7,10 +7,16 @@ const VendorAdminPage = () => {
   const [gatherings, setGatherings] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(false);
+  // 탭별 조회 실패 메시지를 분리해 "데이터 없음"과 구분
+  const [tabError, setTabError] = useState({
+    gatherings: '',
+    reservations: ''
+  });
 
   // API 호출 함수들
   const fetchGatherings = async () => {
     setLoading(true);
+    setTabError((prev) => ({ ...prev, gatherings: '' }));
     try {
       const response = await fetch('/api/gatherings/vendor/admin/vendor-gatherings', {
         credentials: 'include', // 쿠키 포함
@@ -18,8 +24,13 @@ const VendorAdminPage = () => {
       });
       
       if (response.status === 403) {
-        alert('관리자 권한이 필요합니다.');
+        setGatherings([]);
+        setTabError((prev) => ({ ...prev, gatherings: '관리자 권한이 필요합니다.' }));
         return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`목록 조회 실패 (HTTP ${response.status})`);
       }
       
       const data = await response.json();
@@ -32,6 +43,7 @@ const VendorAdminPage = () => {
     } catch (error) {
       console.error('데이터 로딩 실패:', error);
       setGatherings([]);
+      setTabError((prev) => ({ ...prev, gatherings: '원데이클래스 목록을 불러오지 못했습니다.' }));
     } finally {
       setLoading(false);
     }
@@ -39,6 +51,7 @@ const VendorAdminPage = () => {
 
   const fetchReservations = async () => {
     setLoading(true);
+    setTabError((prev) => ({ ...prev, reservations: '' }));
     try {
       const response = await fetch('/api/gatherings/vendor/admin/reservations', {
         credentials: 'include', // 쿠키 포함
@@ -46,8 +59,13 @@ const VendorAdminPage = () => {
       });
       
       if (response.status === 403) {
-        alert('관리자 권한이 필요합니다.');
+        setReservations([]);
+        setTabError((prev) => ({ ...prev, reservations: '관리자 권한이 필요합니다.' }));
         return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`예약 조회 실패 (HTTP ${response.status})`);
       }
       
       const data = await response.json();
@@ -60,6 +78,7 @@ const VendorAdminPage = () => {
     } catch (error) {
       console.error('예약 데이터 로딩 실패:', error);
       setReservations([]);
+      setTabError((prev) => ({ ...prev, reservations: '예약 데이터를 불러오지 못했습니다.' }));
     } finally {
       setLoading(false);
     }
@@ -72,6 +91,9 @@ const VendorAdminPage = () => {
       fetchReservations();
     }
   }, [activeTab]);
+
+  const activeError = activeTab === 'gatherings' ? tabError.gatherings : tabError.reservations;
+  const activeRetry = activeTab === 'gatherings' ? fetchGatherings : fetchReservations;
 
   return (
     <div className="vendor-admin-page">
@@ -96,6 +118,13 @@ const VendorAdminPage = () => {
       <main className="vendor-admin-content">
         {loading ? (
           <div className="vendor-admin-loading">로딩 중...</div>
+        ) : activeError ? (
+          <div className="vendor-admin-status vendor-admin-status--error" role="alert">
+            <p>{activeError}</p>
+            <button type="button" className="vendor-admin-retry-btn" onClick={activeRetry}>
+              다시 시도
+            </button>
+          </div>
         ) : (
           <>
             {activeTab === 'gatherings' && (

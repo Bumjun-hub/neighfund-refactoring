@@ -6,6 +6,8 @@ import './ClassListPage.css';
 const ClassListPage = () => {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  // 클래스 목록: 실패와 빈 목록을 구분하기 위한 에러 상태
+  const [fetchError, setFetchError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [locationFilter, setLocationFilter] = useState('ALL');
@@ -84,6 +86,7 @@ const ClassListPage = () => {
   // 승인된 원데이 클래스 목록 가져오기
   const fetchApprovedClasses = async () => {
     setLoading(true);
+    setFetchError('');
     try {
       const response = await fetch('/api/gatherings/vendor/list', {
         credentials: 'include',
@@ -91,7 +94,7 @@ const ClassListPage = () => {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`목록 조회 실패 (HTTP ${response.status})`);
       }
       
       const data = await response.json();
@@ -107,6 +110,7 @@ const ClassListPage = () => {
     } catch (error) {
       console.error('데이터 로딩 실패:', error);
       setClasses([]);
+      setFetchError('클래스 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
@@ -158,6 +162,19 @@ const ClassListPage = () => {
     return (
       <div className="class-list-page">
         <div className="loading">로딩 중...</div>
+      </div>
+    );
+  }
+
+  if (fetchError && classes.length === 0) {
+    return (
+      <div className="class-list-page">
+        <div className="class-status class-status--error" role="alert">
+          <p>{fetchError}</p>
+          <button type="button" className="class-retry-btn" onClick={fetchApprovedClasses}>
+            다시 시도
+          </button>
+        </div>
       </div>
     );
   }

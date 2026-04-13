@@ -1,15 +1,17 @@
 import Section from "../../components/Section";
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import './MainPage.css';
 import { Link } from 'react-router-dom'
-import { slides, categories, neighborhoodProjects, lastMinuteProjects } from '../../datas/dummydata';
+import { slides, categories } from '../../datas/dummydata';
 
 const MainPage = () => {
 
     const [currentSlide, setCurrentSlide] = useState(0);
     const [isAutoPlay, setIsAutoPlay] = useState(true);
     const [funds, setFunds] = useState([]);
+    // 메인 펀딩 데이터 로딩 상태를 분리해 "데이터 없음"과 "조회 실패"를 구분
+    const [fundFetchStatus, setFundFetchStatus] = useState('loading'); // loading | ready | error
 
     // 마감일
     const calcDday = (deadlineStr) => {
@@ -25,19 +27,27 @@ const MainPage = () => {
         fund => fund.locationName && fund.locationName !== "없음"
     );
 
-
-
+    const loadFunds = useCallback(async () => {
+        setFundFetchStatus('loading');
+        try {
+            const res = await fetch("/api/fund/view");
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            // 백엔드에서 내려주는 imageUrl을 그대로 사용
+            setFunds(Array.isArray(data) ? data : []);
+            setFundFetchStatus('ready');
+        } catch (err) {
+            console.error("펀딩 데이터 불러오기 실패:", err);
+            setFunds([]);
+            setFundFetchStatus('error');
+        }
+    }, []);
 
     useEffect(() => {
-        fetch("/api/fund/view")
-            .then(res => res.json())
-            .then(data => {
-
-                // 백엔드에서 내려주는 imageUrl을 그대로 사용
-                setFunds(data);
-            })
-            .catch(err => console.error("펀딩 데이터 불러오기 실패:", err));
-    }, []);
+        loadFunds();
+    }, [loadFunds]);
 
 
 
@@ -160,11 +170,28 @@ const MainPage = () => {
                     </div>
                 </section>
 
+                {fundFetchStatus === 'loading' && (
+                    <div className="main-fund-status main-fund-status--loading" role="status">
+                        메인 펀딩 데이터를 불러오는 중입니다...
+                    </div>
+                )}
+
+                {fundFetchStatus === 'error' && (
+                    <div className="main-fund-status main-fund-status--error" role="alert">
+                        <p>메인 펀딩 데이터를 불러오지 못했습니다.</p>
+                        <button type="button" className="main-fund-retry-btn" onClick={loadFunds}>
+                            다시 시도
+                        </button>
+                    </div>
+                )}
+
                 {/* Featured Project */}
                 <section className="featured-section">
                     <div className="container">
                         <h2 className="section-title">주목할 만한 프로젝트</h2>
-                        {bestFund ? (
+                        {fundFetchStatus === 'loading' ? (
+                            <p>주목할 만한 프로젝트를 준비 중입니다.</p>
+                        ) : bestFund ? (
                             <Link to={`/funding/info/${bestFund.id}`} className="featured-project-link">
                                 <div className="featured-project">
                                     <div className="project-image">

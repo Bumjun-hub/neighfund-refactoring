@@ -8,10 +8,13 @@ const SurveyWritePage = () => {
     const [question, setQuestion] = useState('');
     const [options, setOptions] = useState(['', '']);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [authStatus, setAuthStatus] = useState('loading'); // loading | ready | error
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
         const checkAdmin = async () => {
+            setAuthStatus('loading');
             try {
                 let res = await fetch("/api/auth/roleinfo", { credentials: "include" });
 
@@ -25,11 +28,13 @@ const SurveyWritePage = () => {
                 const data = await res.json();
                 if (data.roleName === "ROLE_ADMIN") {
                     setIsAdmin(true);
+                    setAuthStatus('ready');
                 } else {
                     alert("관리자만 접근 가능합니다.");
                     navigate("/");
                 }
             } catch (err) {
+                setAuthStatus('error');
                 alert("로그인이 필요합니다.");
                 navigate("/login");
             }
@@ -52,6 +57,8 @@ const SurveyWritePage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
+        setIsSubmitting(true);
         try {
             const res = await fetch('/api/survey/admin/write', {
                 method: 'POST',
@@ -74,8 +81,18 @@ const SurveyWritePage = () => {
             }
         } catch (err) {
             alert('서버 오류 발생');
+        } finally {
+            setIsSubmitting(false);
         }
     };
+
+    if (authStatus === 'loading') {
+        return (
+            <Section>
+                <div className="survey-write-status">권한을 확인하는 중입니다...</div>
+            </Section>
+        );
+    }
 
     if (!isAdmin) return null;
 
@@ -106,10 +123,12 @@ const SurveyWritePage = () => {
                             )}
                         </div>
                     ))}
-                    <button type="button" onClick={addOption}>옵션 추가</button>
+                    <button type="button" onClick={addOption} disabled={isSubmitting}>옵션 추가</button>
 
                     <br /><br />
-                    <button type="submit">등록</button>
+                    <button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? '등록 중...' : '등록'}
+                    </button>
                 </form>
             </div>
         </Section>

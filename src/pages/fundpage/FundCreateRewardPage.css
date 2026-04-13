@@ -75,3 +75,9 @@
   background-color: #ccc;
   cursor: not-allowed;
 }
+
+.fund-create-reward-error {
+  color: #b71c1c;
+  font-size: 14px;
+  margin-top: -4px;
+}

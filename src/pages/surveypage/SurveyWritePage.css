@@ -16,6 +16,16 @@
   text-align: center;
 }
 
+.survey-write-status {
+  max-width: 420px;
+  margin: 40px auto;
+  padding: 18px;
+  border-radius: 12px;
+  text-align: center;
+  background: #eef5ff;
+  color: #1f4f8f;
+}
+
 .survey-write-wrapper label {
   display: block;
   font-weight: bold;

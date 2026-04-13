@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './MyPage.css';
 import MyPageEditProfile from './MyPageEditProfile';
@@ -23,13 +23,11 @@ const MyPage = () => {
     const [updateKey, setUpdateKey] = useState(0);
     const [currentView, setCurrentView] = useState('main'); 
     const [showPasswordCheck, setShowPasswordCheck] = useState(false); 
+    // 마이페이지 첫 화면에서 사용자 정보 로딩/실패를 분리
+    const [profileStatus, setProfileStatus] = useState('loading'); // loading | ready | error
     const { user } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-
-    useEffect(() => {
-        fetchUserInfo();
-    }, []);
 
     // ✅ 프로필 업데이트 이벤트 감지
     useEffect(() => {
@@ -82,7 +80,8 @@ const MyPage = () => {
         return `http://localhost:8080${imageUrl}?t=${Date.now()}`;
     };
 
-    const fetchUserInfo = async () => {
+    const fetchUserInfo = useCallback(async () => {
+        setProfileStatus('loading');
         try {
             const response = await authenticatedFetch('http://localhost:8080/api/auth/mypage', {
                 method: 'GET',
@@ -98,12 +97,19 @@ const MyPage = () => {
                     address: data.address,
                     profileImage: data.imageUrl 
                 });
+                setProfileStatus('ready');
+            } else {
+                setProfileStatus('error');
             }
         } catch (error) {
             console.error('MyPage: 사용자 정보 로드 실패:', error);
-            alert('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
+            setProfileStatus('error');
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchUserInfo();
+    }, [fetchUserInfo]);
 
     const handleEditProfile = () => {
         setShowPasswordCheck(true);
@@ -131,7 +137,7 @@ const MyPage = () => {
         if (currentView === 'main') {
             fetchUserInfo();
         }
-    }, [currentView]);
+    }, [currentView, fetchUserInfo]);
 
     if (currentView === 'editProfile') {
         return <MyPageEditProfile />;
@@ -139,6 +145,27 @@ const MyPage = () => {
 
     if (currentView === 'myPosts') {
         return <MyPosts />;
+    }
+
+    if (profileStatus === 'loading') {
+        return (
+            <div className="mypage-container">
+                <div className="mypage-status">사용자 정보를 불러오는 중입니다...</div>
+            </div>
+        );
+    }
+
+    if (profileStatus === 'error') {
+        return (
+            <div className="mypage-container">
+                <div className="mypage-status mypage-status--error" role="alert">
+                    <p>사용자 정보를 불러오지 못했습니다.</p>
+                    <button type="button" className="mypage-retry-btn" onClick={fetchUserInfo}>
+                        다시 시도
+                    </button>
+                </div>
+            </div>
+        );
     }
 
     return (

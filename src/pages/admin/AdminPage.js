@@ -21,6 +21,44 @@ const AdminPage = () => {
   const [selectedFundId, setSelectedFundId] = useState("");
 
   const [gatherings, setGatherings] = useState([]);
+  // 탭별 조회 상태: 빈 목록과 조회 실패를 구분하기 위해 공통 상태 사용
+  const [tabStatus, setTabStatus] = useState({
+    fund: 'loading',
+    community: 'loading',
+    survey: 'loading',
+    orders: 'ready',
+    gathering: 'loading',
+  });
+  const [tabError, setTabError] = useState({
+    fund: '',
+    community: '',
+    survey: '',
+    orders: '',
+    gathering: '',
+  });
+
+  const setTabLoading = (tabKey) => {
+    setTabStatus((prev) => ({ ...prev, [tabKey]: 'loading' }));
+    setTabError((prev) => ({ ...prev, [tabKey]: '' }));
+  };
+
+  const setTabReady = (tabKey) => {
+    setTabStatus((prev) => ({ ...prev, [tabKey]: 'ready' }));
+    setTabError((prev) => ({ ...prev, [tabKey]: '' }));
+  };
+
+  const setTabFail = (tabKey, message) => {
+    setTabStatus((prev) => ({ ...prev, [tabKey]: 'error' }));
+    setTabError((prev) => ({ ...prev, [tabKey]: message }));
+  };
+
+  const safeFetchJson = async (url, options = {}, fallbackMessage = '데이터 요청에 실패했습니다.') => {
+    const res = await fetch(url, options);
+    if (!res.ok) {
+      throw new Error(`${fallbackMessage} (HTTP ${res.status})`);
+    }
+    return res.json();
+  };
 
   // 관리자 인증
   useEffect(() => {
@@ -54,37 +92,83 @@ const AdminPage = () => {
   }, [selectedFundId, activeTab]);
 
   const fetchFunds = async () => {
-    const [res1, res2] = await Promise.all([
-      fetch('/api/fund/admin/unapproved'),
-      fetch('/api/fund/view')
-    ]);
-    setUnapprovedFunds(await res1.json());
-    setApprovedFunds(await res2.json());
+    setTabLoading('fund');
+    try {
+      const [pendingData, approvedData] = await Promise.all([
+        safeFetchJson('/api/fund/admin/unapproved', {}, '미승인 펀딩 목록 조회 실패'),
+        safeFetchJson('/api/fund/view', {}, '승인 펀딩 목록 조회 실패'),
+      ]);
+      setUnapprovedFunds(Array.isArray(pendingData) ? pendingData : []);
+      setApprovedFunds(Array.isArray(approvedData) ? approvedData : []);
+      setTabReady('fund');
+    } catch (err) {
+      console.error(err);
+      setUnapprovedFunds([]);
+      setApprovedFunds([]);
+      setTabFail('fund', '펀딩 목록을 불러오지 못했습니다.');
+    }
   };
 
   const fetchCommunityPosts = async () => {
-    const res = await fetch('/api/community/view', { credentials: 'include' });
-    setCommunityPosts(await res.json());
+    setTabLoading('community');
+    try {
+      const data = await safeFetchJson('/api/community/view', { credentials: 'include' }, '제안 게시판 조회 실패');
+      setCommunityPosts(Array.isArray(data) ? data : []);
+      setTabReady('community');
+    } catch (err) {
+      console.error(err);
+      setCommunityPosts([]);
+      setTabFail('community', '제안 게시판 데이터를 불러오지 못했습니다.');
+    }
   };
 
   const fetchSurveys = async () => {
-    const res = await fetch("/api/survey/admin/view", { credentials: "include" });
-    setSurveys(await res.json());
+    setTabLoading('survey');
+    try {
+      const data = await safeFetchJson("/api/survey/admin/view", { credentials: "include" }, '설문 목록 조회 실패');
+      setSurveys(Array.isArray(data) ? data : []);
+      setTabReady('survey');
+    } catch (err) {
+      console.error(err);
+      setSurveys([]);
+      setTabFail('survey', '설문 목록을 불러오지 못했습니다.');
+    }
   };
 
   const fetchFundTitles = async () => {
-    const res = await fetch("/api/fund/titles");
-    setFunds(await res.json());
+    try {
+      const data = await safeFetchJson("/api/fund/titles", {}, '펀딩 제목 목록 조회 실패');
+      setFunds(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      setFunds([]);
+    }
   };
 
   const fetchOrders = async () => {
-    const res = await fetch('/api/orders/admin/order', { credentials: 'include' });
-    setOrders(await res.json());
+    setTabLoading('orders');
+    try {
+      const data = await safeFetchJson('/api/orders/admin/order', { credentials: 'include' }, '주문 목록 조회 실패');
+      setOrders(Array.isArray(data) ? data : []);
+      setTabReady('orders');
+    } catch (err) {
+      console.error(err);
+      setOrders([]);
+      setTabFail('orders', '주문 목록을 불러오지 못했습니다.');
+    }
   };
 
   const fetchOrdersByFund = async (fundId) => {
-    const res = await fetch(`/api/orders/admin/byFund/${fundId}`, { credentials: 'include' });
-    setOrders(await res.json());
+    setTabLoading('orders');
+    try {
+      const data = await safeFetchJson(`/api/orders/admin/byFund/${fundId}`, { credentials: 'include' }, '펀딩별 주문 조회 실패');
+      setOrders(Array.isArray(data) ? data : []);
+      setTabReady('orders');
+    } catch (err) {
+      console.error(err);
+      setOrders([]);
+      setTabFail('orders', '선택한 펀딩의 주문 목록을 불러오지 못했습니다.');
+    }
   };
 
   const handleSelectFund = async (fund) => {
@@ -141,11 +225,30 @@ const AdminPage = () => {
   };
 
   const fetchGatherings = async () => {
-    const res = await fetch('/api/gatherings/free/list', { credentials: 'include' });
-    const data = await res.json();
-    setGatherings(Array.isArray(data) ? data : []);
+    setTabLoading('gathering');
+    try {
+      const data = await safeFetchJson('/api/gatherings/free/list', { credentials: 'include' }, '소모임 목록 조회 실패');
+      setGatherings(Array.isArray(data) ? data : []);
+      setTabReady('gathering');
+    } catch (err) {
+      console.error(err);
+      setGatherings([]);
+      setTabFail('gathering', '소모임 목록을 불러오지 못했습니다.');
+    }
   };
 
+  const getRetryHandler = () => {
+    if (activeTab === 'fund') return fetchFunds;
+    if (activeTab === 'community') return fetchCommunityPosts;
+    if (activeTab === 'survey') return fetchSurveys;
+    if (activeTab === 'orders') return selectedFundId ? () => fetchOrdersByFund(selectedFundId) : fetchOrders;
+    if (activeTab === 'gathering') return fetchGatherings;
+    return null;
+  };
+
+  const retryHandler = getRetryHandler();
+  const isActiveTabLoading = tabStatus[activeTab] === 'loading';
+  const isActiveTabError = tabStatus[activeTab] === 'error';
 
 
   return (
@@ -168,8 +271,25 @@ const AdminPage = () => {
         )}
       </div>
 
+      {isActiveTabLoading && (
+        <div className="admin-status admin-status--loading" role="status">
+          데이터를 불러오는 중입니다...
+        </div>
+      )}
+
+      {isActiveTabError && (
+        <div className="admin-status admin-status--error" role="alert">
+          <p>{tabError[activeTab] || '데이터를 불러오지 못했습니다.'}</p>
+          {retryHandler && (
+            <button type="button" className="admin-retry-btn" onClick={retryHandler}>
+              다시 시도
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 탭별 렌더링 */}
-      {activeTab === 'fund' && (
+      {activeTab === 'fund' && !isActiveTabLoading && !isActiveTabError && (
         <FundAdminTab
           fundMode={fundMode}
           setFundMode={setFundMode}
@@ -183,28 +303,28 @@ const AdminPage = () => {
 
       )}
 
-      {activeTab === 'community' && (
+      {activeTab === 'community' && !isActiveTabLoading && !isActiveTabError && (
         <CommunityAdminTab
           communityPosts={communityPosts}
           handleCommunityStatusChange={handleCommunityStatusChange}
         />
       )}
 
-      {activeTab === 'survey' && (
+      {activeTab === 'survey' && !isActiveTabLoading && !isActiveTabError && (
         <SurveyAdminTab
           surveys={surveys}
           handleSurveyVisibleChange={handleSurveyVisibleChange}
         />
       )}
 
-      {activeTab === 'orders' && (
+      {activeTab === 'orders' && !isActiveTabLoading && !isActiveTabError && (
         <OrderAdminTab
           orders={orders}
           selectedFundId={selectedFundId} // ✅ 추가
           handleOrderStatusChange={handleOrderStatusChange}
         />
       )}
-      {activeTab === 'gathering' && (
+      {activeTab === 'gathering' && !isActiveTabLoading && !isActiveTabError && (
         <GatheringAdminTab
           gatherings={gatherings}
           onDelete={handleGatheringDelete}

@@ -17,6 +17,36 @@
   padding: 0 2rem;
 }
 
+.main-fund-status {
+  max-width: 1200px;
+  margin: 16px auto;
+  padding: 14px 18px;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.main-fund-status--loading {
+  background: #eef5ff;
+  color: #1f4f8f;
+}
+
+.main-fund-status--error {
+  background: #fff1f0;
+  border: 1px solid #ffd5d1;
+  color: #8f2d27;
+}
+
+.main-fund-retry-btn {
+  margin-top: 10px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #2d8cf0;
+  color: #fff;
+  cursor: pointer;
+}
+
 /* Categories */
 .hero-slider {
   position: relative;

@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import './FundInfoPage.css';
 import './Modal.css';
 import Section from '../../components/Section';
@@ -8,9 +8,13 @@ import FundParticipatePage from '../fundparticipantpage/FundParticipatePage.js';
 const FundInfoPage = () => {
     const { id } = useParams();
     const [fund, setFund] = useState(null);
+    // 상세 API: 로딩·네트워크 오류·없는 펀딩을 서로 다른 화면으로 구분
+    const [fundFetchStatus, setFundFetchStatus] = useState('loading'); // loading | ready | error | notFound
     const [activeTab, setActiveTab] = useState('intro');
     const [selectedReward, setSelectedReward] = useState(null);
     const [myOrderOptionIds, setMyOrderOptionIds] = useState([]);
+    // 주문 API는 비로그인 등으로 실패할 수 있어 본문은 유지하고 안내만 표시
+    const [ordersFetchError, setOrdersFetchError] = useState(null);
     const [showModal, setShowModal] = useState(false); //  모달 제어용
     const isClosed = fund && new Date(fund.deadline) < new Date();
     const [isAdmin, setIsAdmin] = useState(false); // ✅ 관리자 여부 확인용
@@ -101,29 +105,108 @@ const FundInfoPage = () => {
     };
 
 
-    //  주문한 리워드 불러오기
+    //  주문한 리워드 불러오기 (실패 시 리스트는 비우고, UI에만 경고 — 상세 본문은 그대로)
     useEffect(() => {
-        fetch("/api/orders/myPage/order", {
-            method: "GET",
-            credentials: "include",
-        })
-            .then((res) => res.ok ? res.json() : [])
-            .then((data) => {
-                const optionIds = data.map(order => order.optionId);
+        let cancelled = false;
+        (async () => {
+            setOrdersFetchError(null);
+            try {
+                const res = await fetch("/api/orders/myPage/order", {
+                    method: "GET",
+                    credentials: "include",
+                });
+                if (!res.ok) {
+                    if (!cancelled) {
+                        setMyOrderOptionIds([]);
+                        setOrdersFetchError("신청한 리워드 정보를 불러오지 못했습니다.");
+                    }
+                    return;
+                }
+                const data = await res.json();
+                if (cancelled) return;
+                const list = Array.isArray(data) ? data : [];
+                const optionIds = list.map((order) => order.optionId);
                 setMyOrderOptionIds(optionIds);
-            })
-            .catch(() => setMyOrderOptionIds([]));
+            } catch {
+                if (!cancelled) {
+                    setMyOrderOptionIds([]);
+                    setOrdersFetchError("신청한 리워드 정보를 불러오지 못했습니다.");
+                }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
     }, []);
+
+    const loadFundDetail = useCallback(async () => {
+        if (!id) {
+            setFund(null);
+            setFundFetchStatus('notFound');
+            return;
+        }
+        setFundFetchStatus('loading');
+        setFund(null);
+        try {
+            const res = await fetch(`/api/fund/view/${id}`);
+            if (res.status === 404) {
+                setFundFetchStatus('notFound');
+                return;
+            }
+            if (!res.ok) {
+                setFundFetchStatus('error');
+                return;
+            }
+            const data = await res.json();
+            if (data == null || typeof data !== 'object') {
+                setFundFetchStatus('notFound');
+                return;
+            }
+            setFund(data);
+            setFundFetchStatus('ready');
+        } catch (e) {
+            console.error("❌ 상세 불러오기 실패:", e);
+            setFundFetchStatus('error');
+        }
+    }, [id]);
 
     //  펀딩 정보 불러오기
     useEffect(() => {
-        fetch(`/api/fund/view/${id}`)
-            .then((res) => res.json())
-            .then((data) => setFund(data))
-            .catch((err) => console.error("❌ 상세 불러오기 실패:", err));
-    }, [id]);
+        loadFundDetail();
+    }, [loadFundDetail]);
 
-    if (!fund) return <div className="not-found">해당 펀딩을 찾을 수 없습니다.</div>;
+    if (fundFetchStatus === 'loading') {
+        return (
+            <Section>
+                <div className="fund-fetch-status fund-fetch-status--loading" role="status">
+                    펀딩 정보를 불러오는 중입니다…
+                </div>
+            </Section>
+        );
+    }
+
+    if (fundFetchStatus === 'error') {
+        return (
+            <Section>
+                <div className="fund-fetch-status fund-fetch-status--error" role="alert">
+                    <p>펀딩 정보를 불러오지 못했습니다.</p>
+                    <button type="button" className="fund-fetch-retry-btn" onClick={loadFundDetail}>
+                        다시 시도
+                    </button>
+                </div>
+            </Section>
+        );
+    }
+
+    if (fundFetchStatus === 'notFound' || !fund) {
+        return (
+            <Section>
+                <div className="fund-fetch-status fund-fetch-status--not-found">
+                    해당 펀딩을 찾을 수 없습니다.
+                </div>
+            </Section>
+        );
+    }
 
     return (
         <Section>
@@ -135,6 +218,9 @@ const FundInfoPage = () => {
                         </button>
                     )}
                 </h2>
+                {ordersFetchError && (
+                    <p className="fund-orders-warning" role="status">{ordersFetchError}</p>
+                )}
                 {/* 상단 */}
                 <div className="fund-info-top">
                     <img src={fund.fundImages?.[0]} alt={fund.title} className="fund-info-image" />

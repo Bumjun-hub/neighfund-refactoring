@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import './Header.css';
 import { IoIosNotificationsOutline } from "react-icons/io";
 import { logout } from '../utils/authUtils';
@@ -12,6 +12,8 @@ const Header = () => {
     const [userInfo, setUserInfo] = useState(null);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isAdmin, setIsAdmin] = useState(false);
+    // 알림 영역: 빈 알림과 조회 실패를 구분
+    const [notificationsStatus, setNotificationsStatus] = useState('idle'); // idle | loading | ready | error
 
     const navigate = useNavigate();
 
@@ -105,40 +107,57 @@ const Header = () => {
         }
     };
 
-    // 렌더링할때 모든 유저의 안읽은 알림 반환
-    useEffect(() => {
-        const fetchNotifications = async () => {
-            try {
-                const res = await fetch('/api/notifications/get', { credentials: 'include' });
-                const data = await res.json();
-                const unread = data.filter((n) => !n.isRead);
-                setNotifications(unread);
-            } catch (err) {
-                console.error('알림 불러오기 실패', err);
+    const loadNotifications = useCallback(async () => {
+        if (!isLoggedIn) return;
+        setNotificationsStatus('loading');
+        try {
+            const res = await fetch('/api/notifications/get', { credentials: 'include' });
+            if (!res.ok) {
+                throw new Error(`알림 조회 실패 (HTTP ${res.status})`);
             }
-        };
-
-        if (isLoggedIn) {
-            fetchNotifications();
+            const data = await res.json();
+            const unread = (Array.isArray(data) ? data : []).filter((n) => !n.isRead);
+            setNotifications(unread);
+            setNotificationsStatus('ready');
+        } catch (err) {
+            console.error('알림 불러오기 실패', err);
+            setNotifications([]);
+            setNotificationsStatus('error');
         }
     }, [isLoggedIn]);
+
+    const loadUnreadCount = useCallback(async () => {
+        if (!isLoggedIn) return;
+        try {
+            const res = await fetch('/api/notifications/count/unread', { credentials: 'include' });
+            if (!res.ok) {
+                throw new Error(`알림 수 조회 실패 (HTTP ${res.status})`);
+            }
+            const count = await res.json();
+            setUnreadCount(Number.isFinite(Number(count)) ? Number(count) : 0);
+        } catch (err) {
+            console.error('알림 수 불러오기 실패', err);
+        }
+    }, [isLoggedIn]);
+
+    // 렌더링할때 모든 유저의 안읽은 알림 반환
+    useEffect(() => {
+        if (isLoggedIn) {
+            loadNotifications();
+        } else {
+            setNotifications([]);
+            setNotificationsStatus('idle');
+        }
+    }, [isLoggedIn, loadNotifications]);
 
     // ✅ 알림 수 표시 초기값 불러오기
     useEffect(() => {
-        const fetchUnreadCount = async () => {
-            try {
-                const res = await fetch('/api/notifications/count/unread', { credentials: 'include' });
-                const count = await res.json();
-                setUnreadCount(count);
-            } catch (err) {
-                console.error('알림 수 불러오기 실패', err);
-            }
-        };
-
         if (isLoggedIn) {
-            fetchUnreadCount();
+            loadUnreadCount();
+        } else {
+            setUnreadCount(0);
         }
-    }, [isLoggedIn]);
+    }, [isLoggedIn, loadUnreadCount]);
 
     // ✅ 최초 로그인 상태 확인
     useEffect(() => {
@@ -224,7 +243,16 @@ const Header = () => {
                             {showNotifications && (
                                 <div className="notification-dropdown">
                                     <div className="notification-header">알림</div>
-                                    {notifications.length === 0 ? (
+                                    {notificationsStatus === 'loading' ? (
+                                        <div className="notification-empty">알림을 불러오는 중입니다...</div>
+                                    ) : notificationsStatus === 'error' ? (
+                                        <div className="notification-empty notification-empty-error">
+                                            <p>알림을 불러오지 못했습니다.</p>
+                                            <button type="button" className="notification-retry-btn" onClick={loadNotifications}>
+                                                다시 시도
+                                            </button>
+                                        </div>
+                                    ) : notifications.length === 0 ? (
                                         <div className="notification-empty">새로운 알림이 없습니다.</div>
                                     ) : (
                                         <ul className="notification-list">
