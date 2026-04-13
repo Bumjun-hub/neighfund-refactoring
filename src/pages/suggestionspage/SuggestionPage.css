@@ -1,0 +1,176 @@
+.suggestion-wrapper {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  font-family: 'Pretendard', sans-serif;
+}
+
+.suggestion-header {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+}
+
+.suggestion-location {
+  font-size: 14px;
+  color: #3862c7;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.suggestion-title {
+  text-align: center;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.filters select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: white;
+  border: 1px solid #ccc;
+  cursor: pointer;
+}
+
+.suggestion-write-button {
+  margin-left: auto;
+  background-color: #4caf50;
+  color: white;
+  padding: 8px 14px;
+  margin-bottom: 10px;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.suggestion-write-button:hover {
+  background-color: #388e3c;
+}
+
+.suggestion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.suggestion-content {
+  font-size: 15px;
+  color: #333;
+  line-height: 1.4;
+}
+
+.suggestion-username {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+
+.suggestion-card .suggestion-meta {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.suggestion-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.suggestion-likes {
+  font-size: 14px;
+  font-weight: bold;
+  color: #555;
+  margin-right: auto;
+}
+
+.suggestion-like-button {
+  background-color: #f2f2f2;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.suggestion-like-button:hover {
+  background-color: #e0e0e0;
+}
+
+.suggestion-status {
+  background-color: #cde0f5;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.suggestion-edit-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  background-color: transparent;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  text-align: center;
+  color: #666;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s ease-in-out;
+  font-size: 30px;
+  margin-right: 20px;
+}
+
+.suggestion-edit-button:hover {
+  color: #000;
+  transform: scale(1.15);
+}
+
+
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .suggestion-card {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: 16px;
+  }
+
+  .suggestion-content {
+    font-size: 14px;
+  }
+
+  .title,
+  .suggestion-content {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
