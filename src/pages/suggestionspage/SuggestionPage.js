@@ -3,16 +3,8 @@ import './SuggestionPage.css';
 import { useNavigate } from "react-router-dom";
 import Section from "../../components/Section";
 import SuggestionAPI from './SuggestionAPI';
-import SuggestionCard from "../../components/SuggestionCard"; // 추가
-
-const categoryMap = {
-  EDUCATION: '교육', ENVIRONMENT: '환경', CULTURE: '문화', PET: '애완동물',
-  SPORTS: '운동', FOOD: '음식', HOBBY: '취미', WELFARE: '복지', ETC: '기타',
-};
-
-const status = {
-  FUNDED: '펀딩 완료', ON_HOLD: '보류 중', RECRUITING: '공감하기'
-};
+import SuggestionPageHeader from './components/SuggestionPageHeader';
+import SuggestionListSection from './components/SuggestionListSection';
 
 const SuggestionPage = () => {
   const [categoryFilter, setCategoryFilter] = useState('전체');
@@ -68,59 +60,21 @@ const SuggestionPage = () => {
   return (
     <Section>
       <div className="suggestion-wrapper">
-        <div className="suggestion-header">
-          <div className="suggestion-title">
-            <h2>제안</h2>
-          </div>
-          <div className="filters">
-            <select value={sortType} onChange={(e) => setSortType(e.target.value)}>
-              <option value="최신순">최신순</option>
-              <option value="공감순">공감순</option>
-            </select>
-            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-              <option value="전체">전체</option>
-              {Object.keys(categoryMap).map((key) => (
-                <option key={key} value={key}>{categoryMap[key]}</option>
-              ))}
-            </select>
-            <button
-              className="suggestion-write-button"
-              onClick={() => navigate('/suggestion/write')}
-            >
-              제안 글쓰기
-            </button>
-          </div>
-        </div>
-        <div className="suggestion-list">
-          {fetchStatus === 'loading' && (
-            <div className="suggestion-status suggestion-status--loading" role="status">
-              제안글을 불러오는 중입니다...
-            </div>
-          )}
+        <SuggestionPageHeader
+          sortType={sortType}
+          categoryFilter={categoryFilter}
+          onSortTypeChange={setSortType}
+          onCategoryFilterChange={setCategoryFilter}
+          onWrite={() => navigate('/suggestion/write')}
+        />
 
-          {fetchStatus === 'error' && (
-            <div className="suggestion-status suggestion-status--error" role="alert">
-              <p>제안글을 불러오지 못했습니다.</p>
-              <button type="button" className="suggestion-retry-btn" onClick={loadSuggestions}>
-                다시 시도
-              </button>
-            </div>
-          )}
-
-          {fetchStatus === 'ready' && filtered.length === 0 && (
-            <div className="suggestion-status">등록된 제안글이 없습니다.</div>
-          )}
-
-          {fetchStatus === 'ready' && filtered.map((item) => (
-              <SuggestionCard
-                key={item.id}
-                post={item}
-                size="large"
-                onEdit={() => navigate(`/suggestion/write/${item.id}`)}
-                onLike={() => handleLike(item.id)}
-              />
-            ))}
-        </div>
+        <SuggestionListSection
+          fetchStatus={fetchStatus}
+          filtered={filtered}
+          onRetry={loadSuggestions}
+          onEdit={(id) => navigate(`/suggestion/write/${id}`)}
+          onLike={handleLike}
+        />
       </div>
     </Section>
   );

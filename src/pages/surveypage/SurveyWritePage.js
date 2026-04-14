@@ -1,15 +1,41 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useReducer, useState } from 'react';
 import './SurveyWritePage.css';
 import { useNavigate } from 'react-router-dom';
 import Section from '../../components/Section';
 import { authenticatedFetch } from '../../utils/authUtils';
+import SurveyWriteStatusView from './components/SurveyWriteStatusView';
+import SurveyWriteForm from './components/SurveyWriteForm';
 
 const SurveyWritePage = () => {
-    const [question, setQuestion] = useState('');
-    const [options, setOptions] = useState(['', '']);
+    const initialFormState = {
+        question: '',
+        options: ['', ''],
+        isSubmitting: false,
+    };
+
+    const formReducer = (state, action) => {
+        switch (action.type) {
+            case 'SET_QUESTION':
+                return { ...state, question: action.payload };
+            case 'SET_OPTION':
+                return {
+                    ...state,
+                    options: state.options.map((opt, index) => (index === action.payload.index ? action.payload.value : opt)),
+                };
+            case 'ADD_OPTION':
+                return { ...state, options: [...state.options, ''] };
+            case 'REMOVE_OPTION':
+                return { ...state, options: state.options.filter((_, index) => index !== action.payload) };
+            case 'SET_SUBMITTING':
+                return { ...state, isSubmitting: action.payload };
+            default:
+                return state;
+        }
+    };
+
+    const [formState, dispatch] = useReducer(formReducer, initialFormState);
     const [isAdmin, setIsAdmin] = useState(false);
     const [authStatus, setAuthStatus] = useState('loading'); // loading | ready | error
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -36,28 +62,24 @@ const SurveyWritePage = () => {
     }, [navigate]);
 
     const handleOptionChange = (index, value) => {
-        const updated = [...options];
-        updated[index] = value;
-        setOptions(updated);
+        dispatch({ type: 'SET_OPTION', payload: { index, value } });
     };
 
-    const addOption = () => setOptions([...options, '']);
+    const addOption = () => dispatch({ type: 'ADD_OPTION' });
     const removeOption = (index) => {
-        const updated = [...options];
-        updated.splice(index, 1);
-        setOptions(updated);
+        dispatch({ type: 'REMOVE_OPTION', payload: index });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (isSubmitting) return;
-        setIsSubmitting(true);
+        if (formState.isSubmitting) return;
+        dispatch({ type: 'SET_SUBMITTING', payload: true });
         try {
             const res = await authenticatedFetch('/api/survey/admin/write', {
                 method: 'POST',
                 body: {
-                    title: question,
-                    options,
+                    title: formState.question,
+                    options: formState.options,
                 },
             });
 
@@ -71,55 +93,28 @@ const SurveyWritePage = () => {
         } catch (err) {
             alert('서버 오류 발생');
         } finally {
-            setIsSubmitting(false);
+            dispatch({ type: 'SET_SUBMITTING', payload: false });
         }
     };
 
     if (authStatus === 'loading') {
-        return (
-            <Section>
-                <div className="survey-write-status">권한을 확인하는 중입니다...</div>
-            </Section>
-        );
+        return <SurveyWriteStatusView message="권한을 확인하는 중입니다..." />;
     }
 
     if (!isAdmin) return null;
 
     return (
         <Section>
-            <div className="survey-write-wrapper">
-                <h2>설문조사 글쓰기</h2>
-                <form onSubmit={handleSubmit}>
-                    <label>질문</label>
-                    <input
-                        type="text"
-                        value={question}
-                        onChange={(e) => setQuestion(e.target.value)}
-                        required
-                    />
-
-                    <label>옵션</label>
-                    {options.map((opt, i) => (
-                        <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                            <input
-                                type="text"
-                                value={opt}
-                                onChange={(e) => handleOptionChange(i, e.target.value)}
-                                required
-                            />
-                            {options.length > 2 && (
-                                <button type="button" onClick={() => removeOption(i)}>삭제</button>
-                            )}
-                        </div>
-                    ))}
-                    <button type="button" onClick={addOption} disabled={isSubmitting}>옵션 추가</button>
-
-                    <br /><br />
-                    <button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? '등록 중...' : '등록'}
-                    </button>
-                </form>
-            </div>
+            <SurveyWriteForm
+                question={formState.question}
+                options={formState.options}
+                isSubmitting={formState.isSubmitting}
+                onQuestionChange={(value) => dispatch({ type: 'SET_QUESTION', payload: value })}
+                onOptionChange={handleOptionChange}
+                onRemoveOption={removeOption}
+                onAddOption={addOption}
+                onSubmit={handleSubmit}
+            />
         </Section>
     );
 };

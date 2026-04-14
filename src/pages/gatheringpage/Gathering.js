@@ -1,19 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import GatheringAPI from './GatheringAPI';
 import GatheringSearchFilter from './GatheringSearchFilter'; // 새로 만든 컴포넌트
 import './Gathering.css';
 import { useNavigate } from 'react-router-dom';
 import { checkAuthStatus } from '../../utils/authUtils';
+import GatheringCreateButton from './components/GatheringCreateButton';
+import GatheringColumn from './components/GatheringColumn';
+import GatheringErrorState from './components/GatheringErrorState';
+import GatheringResultStates from './components/GatheringResultStates';
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 
-const Gathering = () => {
-  const [gatherings, setGatherings] = useState([]);
-  const [filteredGatherings, setFilteredGatherings] = useState([]); // 필터링된 결과
+const gatheringQueryClient = new QueryClient();
+
+const GatheringContent = () => {
   const [hasMore, setHasMore] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState(''); // 검색어 상태
   const [selectedCategory, setSelectedCategory] = useState(''); // 선택된 카테고리 상태
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const gatheringsQuery = useQuery({
+    queryKey: ['gathering', 'list'],
+    queryFn: async () => {
+      const data = await GatheringAPI.getGatheringList();
+      return Array.isArray(data) ? data : [];
+    },
+    retry: false,
+  });
+  const gatherings = gatheringsQuery.data || [];
+  const isLoading = gatheringsQuery.isLoading || gatheringsQuery.isFetching;
+  const error = gatheringsQuery.isError
+    ? '소모임 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+    : null;
 
   const handleCreateGathering = async () => {
     try {
@@ -36,72 +54,41 @@ const Gathering = () => {
     }
   };
 
-  // 검색 처리 함수
   const handleSearch = (keyword) => {
     setSearchKeyword(keyword);
-    applyFilters(keyword, selectedCategory);
   };
 
-  // 카테고리 필터 처리 함수
   const handleCategoryFilter = (category) => {
     setSelectedCategory(category);
-    applyFilters(searchKeyword, category);
   };
 
-  // 필터 적용 함수
-  const applyFilters = useCallback((keyword, category) => {
+  const filteredGatherings = useMemo(() => {
     let filtered = [...gatherings];
 
-    // 검색어 필터링
-    if (keyword && keyword.trim()) {
-      const searchTerm = keyword.toLowerCase().trim();
-      filtered = filtered.filter(gathering => 
+    if (searchKeyword && searchKeyword.trim()) {
+      const searchTerm = searchKeyword.toLowerCase().trim();
+      filtered = filtered.filter((gathering) =>
         gathering.title.toLowerCase().includes(searchTerm) ||
         gathering.content.toLowerCase().includes(searchTerm) ||
         gathering.dongName.toLowerCase().includes(searchTerm)
       );
     }
 
-    // 카테고리 필터링
-    if (category) {
-      filtered = filtered.filter(gathering => gathering.category === category);
+    if (selectedCategory) {
+      filtered = filtered.filter((gathering) => gathering.category === selectedCategory);
     }
 
-    setFilteredGatherings(filtered);
     console.log(`🔍 필터 적용 완료: ${filtered.length}개 결과`);
-  }, [gatherings]);
+    return filtered;
+  }, [gatherings, searchKeyword, selectedCategory]);
 
-  // gatherings가 변경될 때마다 필터 재적용
   useEffect(() => {
-    applyFilters(searchKeyword, selectedCategory);
-  }, [gatherings, applyFilters, searchKeyword, selectedCategory]);
-
-  // 초기 데이터 로드
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  const loadInitialData = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // API 성공 시에만 "빈 목록"으로 간주하고, 실패는 error 상태로 분리
-      const data = await GatheringAPI.getGatheringList();
-      setGatherings(data);
-      
-      // hasMore 설정
-      setHasMore(data.length >= 10);
-      
-    } catch (error) {
-      console.error('소모임 목록 로딩 실패:', error);
-      setGatherings([]);
-      setError('소모임 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+    if (gatheringsQuery.isError) {
       setHasMore(false);
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  };
+    setHasMore(gatherings.length >= 10);
+  }, [gatherings, gatheringsQuery.isError]);
 
   const loadMoreData = useCallback(() => {
     setHasMore(false);
@@ -126,8 +113,8 @@ const Gathering = () => {
 
   // 좋아요 기능 (현재는 로컬 상태만 업데이트)
   const handleLike = (id) => {
-    setGatherings(prev => 
-      prev.map(gathering => 
+    queryClient.setQueryData(['gathering', 'list'], (prev = []) =>
+      prev.map((gathering) =>
         gathering.id === id 
           ? { 
               ...gathering, 
@@ -148,66 +135,9 @@ const Gathering = () => {
     console.log('소모임 상세 페이지로 이동:', gatheringId);
   };
 
-  // 이미지 URL 처리 함수
-  const getImageUrl = (imagePath) => {
-    if (!imagePath) return '/images/noImage.png';
-    
-    // 절대 경로인 경우 그대로 반환
-    if (imagePath.startsWith('http')) return imagePath;
-    
-    // 상대 경로인 경우 서버 URL과 합치기
-    return `http://localhost:8080${imagePath}`;
-  };
-
-  // 카테고리 한글 변환
-  const getCategoryText = (category) => {
-    const categoryMap = {
-      'SPORTS': '스포츠',
-      'SOCIAL': '친목',
-      'LITERATURE': '문학',
-      'OUTDOOR': '아웃도어',
-      'MUSIC': '음악',
-      'JOB': '직업/취업',
-      'CULTURE': '문화',
-      'LANGUAGE': '언어',
-      'GAME': '게임',
-      'CRAFT': '공예/만들기',
-      'DANCE': '댄스',
-      'VOLUNTEER': '봉사',
-      'PHOTO': '사진',
-      'SELF_IMPROVEMENT': '자기계발',
-      'SPORTS_WATCHING': '스포츠 관람',
-      'PET': '반려동물',
-      'COOKING': '요리',
-      'CAR_BIKE': '자동차/바이크',
-      'STUDY': '스터디'
-    };
-    return categoryMap[category] || category;
-  };
-
-  // 날짜 포맷팅
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
   // 에러 상태 렌더링 (401 에러는 제외)
   if (error && gatherings.length === 0) {
-    return (
-      <div className="gathering-container">
-        <div className="error-message">
-          <p>{error}</p>
-          <button onClick={loadInitialData} className="retry-button">
-            다시 시도
-          </button>
-        </div>
-      </div>
-    );
+    return <GatheringErrorState error={error} onRetry={gatheringsQuery.refetch} />;
   }
 
   // 표시할 데이터 결정 (필터링된 결과 사용)
@@ -229,144 +159,40 @@ const Gathering = () => {
         searchKeyword={searchKeyword}
       />
       <div className="gathering-grid">
-        <div className="left-column">
-          {/* 새 소모임 만들기 버튼 */}
-          <div className="gathering-header">
-            <button 
-              className="create-gathering-btn"
-              onClick={handleCreateGathering}
-            >
-              + 새 소모임 만들기
-            </button>
-          </div>
-          {leftColumnCards.map((gathering) => (
-            <div 
-              key={gathering.id} 
-              className="gathering-card"
-              onClick={() => handleCardClick(gathering.id)}
-            >
-              <div className="card-image">
-                <img 
-                  src={getImageUrl(gathering.titleImage)} 
-                  alt={gathering.title}
-                  onError={(e) => {
-                    e.target.src = '/images/noImage.png';
-                  }}
-                />
-                <span className="category-tag">
-                  {getCategoryText(gathering.category)}
-                </span>
-              </div>
-              
-              <div className="card-content">
-                <h3 className="card-title">{gathering.title}</h3>
-                <p className="card-description">{gathering.content}</p>
-                <p className="card-location">📍 {gathering.dongName}</p>
-                
-                <div className="card-footer">
-                  <div className="card-stats">
-                    <span 
-                      className={`likes ${gathering.liked ? 'liked' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation(); // 카드 클릭 이벤트 방지
-                        handleLike(gathering.id);
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {gathering.liked ? '❤️' : '🤍'} {gathering.likes || 0}
-                    </span>
-                    <span className="members">👥 {gathering.memberCount || 0}</span>
-                  </div>
-                  <div className="card-date">
-                    {formatDate(gathering.createdAt)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="right-column">
-          {rightColumnCards.map((gathering) => (
-            <div 
-              key={gathering.id} 
-              className="gathering-card"
-              onClick={() => handleCardClick(gathering.id)}
-            >
-              <div className="card-image">
-                <img 
-                  src={getImageUrl(gathering.titleImage)} 
-                  alt={gathering.title}
-                  onError={(e) => {
-                    e.target.src = '/images/noImage.png';
-                  }}
-                />
-                <span className="category-tag">
-                  {getCategoryText(gathering.category)}
-                </span>
-              </div>
-              
-              <div className="card-content">
-                <h3 className="card-title">{gathering.title}</h3>
-                <p className="card-description">{gathering.content}</p>
-                <p className="card-location">📍 {gathering.dongName}</p>
-                
-                <div className="card-footer">
-                  <div className="card-stats">
-                    <span 
-                      className={`likes ${gathering.liked ? 'liked' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleLike(gathering.id);
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {gathering.liked ? '❤️' : '🤍'} {gathering.likes || 0}
-                    </span>
-                    <span className="members">👥 {gathering.memberCount || 0}</span>
-                  </div>
-                  <div className="card-date">
-                    {formatDate(gathering.createdAt)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      {/* 🆕 검색/필터 결과가 없을 때 메시지 */}
-      {(searchKeyword || selectedCategory) && displayGatherings.length === 0 && !isLoading && (
-        <div className="no-results-message">
-          <div className="no-results-content">
-            <span className="no-results-icon">🔍</span>
-            <h3>검색 결과가 없습니다</h3>
-            <p>'{searchKeyword}'에 대한 검색 결과를 찾을 수 없습니다.</p>
-            <p>다른 키워드나 카테고리로 시도해보세요!</p>
-          </div>
-        </div>
-      )}
-      
-      {isLoading && (
-        <div className="loading-indicator">
-          <div className="loading-spinner"></div>
-          <p>새로운 모임을 불러오는 중...</p>
-        </div>
-      )}
-      
-      {!hasMore && !isLoading && displayGatherings.length > 0 && (
-        <div className="end-message">
-          <p>모든 모임을 확인했습니다! 🎉</p>
-        </div>
-      )}
+        <GatheringColumn
+          className="left-column"
+          cards={leftColumnCards}
+          onCardClick={handleCardClick}
+          onLike={handleLike}
+          renderHeader={() => <GatheringCreateButton onCreate={handleCreateGathering} />}
+        />
 
-      {!isLoading && gatherings.length === 0 && !error && (
-        <div className="empty-message">
-          <p>아직 등록된 소모임이 없습니다.</p>
-          <p>첫 번째 소모임을 만들어보세요! 🎯</p>
-        </div>
-      )}
+        <GatheringColumn
+          className="right-column"
+          cards={rightColumnCards}
+          onCardClick={handleCardClick}
+          onLike={handleLike}
+        />
+      </div>
+
+      <GatheringResultStates
+        searchKeyword={searchKeyword}
+        selectedCategory={selectedCategory}
+        displayCount={displayGatherings.length}
+        isLoading={isLoading}
+        hasMore={hasMore}
+        totalGatheringCount={gatherings.length}
+        hasError={Boolean(error)}
+      />
     </div>
+  );
+};
+
+const Gathering = () => {
+  return (
+    <QueryClientProvider client={gatheringQueryClient}>
+      <GatheringContent />
+    </QueryClientProvider>
   );
 };
 

@@ -1,24 +1,60 @@
-import React, { useState, useEffect, useRef } from 'react';
-import AddressInput from '../memberpage/AddressInput'; 
+import React, { useMemo, useReducer, useRef, useState } from 'react';
 import './MyPageEditProfile.css';
 import { deleteAccount } from '../../utils/authUtils';
 import { getMyProfile, uploadMyProfileImage, updateMyProfile } from './mypageApi';
+import MyProfileEditHeader from './components/MyProfileEditHeader';
+import MyProfileImageSection from './components/MyProfileImageSection';
+import MyProfileFields from './components/MyProfileFields';
+import MyProfileEditActions from './components/MyProfileEditActions';
+import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-const MyPageEditProfile = () => {
-  const [profile, setProfile] = useState({
-    name: '', email: '', phone: '', address: '', detailAddress: '', imageUrl: ''
-  });
+const myProfileQueryClient = new QueryClient();
+
+const initialFormState = {
+  editData: {},
+  phoneError: '',
+  selectedFile: null,
+  previewUrl: '',
+  uploadError: '',
+};
+
+const profileFormReducer = (state, action) => {
+  switch (action.type) {
+    case 'START_EDIT':
+      return {
+        ...state,
+        editData: action.payload,
+        phoneError: '',
+        selectedFile: null,
+        previewUrl: '',
+        uploadError: '',
+      };
+    case 'CANCEL_EDIT':
+    case 'RESET_AFTER_SAVE':
+      return initialFormState;
+    case 'SET_FIELD':
+      return {
+        ...state,
+        editData: { ...state.editData, [action.payload.field]: action.payload.value },
+      };
+    case 'SET_PHONE_ERROR':
+      return { ...state, phoneError: action.payload };
+    case 'SET_SELECTED_FILE':
+      return { ...state, selectedFile: action.payload };
+    case 'SET_PREVIEW_URL':
+      return { ...state, previewUrl: action.payload };
+    case 'SET_UPLOAD_ERROR':
+      return { ...state, uploadError: action.payload };
+    default:
+      return state;
+  }
+};
+
+const MyPageEditProfileContent = () => {
   const [editMode, setEditMode] = useState(false);
-  const [editData, setEditData] = useState({});
-  const [phoneError, setPhoneError] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState('');
-  const [uploadError, setUploadError] = useState('');
+  const [formState, dispatch] = useReducer(profileFormReducer, initialFormState);
   const fileInputRef = useRef(null);
-
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  const queryClient = useQueryClient();
 
   const parseAddress = (fullAddress) => {
     if (!fullAddress) return { address: '', detailAddress: '' };
@@ -32,40 +68,36 @@ const MyPageEditProfile = () => {
     return { address: fullAddress, detailAddress: '' };
   };
 
-  const fetchProfile = async () => {
-    try {
-      const data = await getMyProfile();
-      const { address, detailAddress } = parseAddress(data.address);
+  const profileQuery = useQuery({
+    queryKey: ['mypage', 'profile'],
+    queryFn: getMyProfile,
+    retry: false,
+  });
 
-      setProfile({
-        name: data.username || data.name,
-        email: data.email,
-        phone: data.phone,
-        address,
-        detailAddress,
-        imageUrl: data.imageUrl || '/static/profileimages/profile1.jpg'
-      });
-    } catch (err) {
-      console.error('프로필 로드 실패:', err);
+  const profile = useMemo(() => {
+    const data = profileQuery.data;
+    if (!data) {
+      return { name: '', email: '', phone: '', address: '', detailAddress: '', imageUrl: '' };
     }
-  };
+    const { address, detailAddress } = parseAddress(data.address);
+    return {
+      name: data.username || data.name,
+      email: data.email,
+      phone: data.phone,
+      address,
+      detailAddress,
+      imageUrl: data.imageUrl || '/static/profileimages/profile1.jpg',
+    };
+  }, [profileQuery.data]);
 
   const startEdit = () => {
-    setEditData({ ...profile });
+    dispatch({ type: 'START_EDIT', payload: { ...profile } });
     setEditMode(true);
-    setPhoneError('');
-    setUploadError('');
-    setSelectedFile(null);
-    setPreviewUrl('');
   };
 
   const cancelEdit = () => {
     setEditMode(false);
-    setEditData({});
-    setPhoneError('');
-    setUploadError('');
-    setSelectedFile(null);
-    setPreviewUrl('');
+    dispatch({ type: 'CANCEL_EDIT' });
     // 파일 input 초기화
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -78,12 +110,12 @@ const MyPageEditProfile = () => {
       
       // 전화번호 유효성 검사
       if (value && value.length > 0 && value.length !== 13) {
-        setPhoneError(`전화번호는 13자리로 입력해주세요. (현재: ${value.length}자리)`);
+        dispatch({ type: 'SET_PHONE_ERROR', payload: `전화번호는 13자리로 입력해주세요. (현재: ${value.length}자리)` });
       } else {
-        setPhoneError('');
+        dispatch({ type: 'SET_PHONE_ERROR', payload: '' });
       }
     }
-    setEditData(prev => ({ ...prev, [field]: value }));
+    dispatch({ type: 'SET_FIELD', payload: { field, value } });
   };
 
   const formatPhoneNumber = (value) => {
@@ -92,7 +124,7 @@ const MyPageEditProfile = () => {
     
     // 11자리 이상 입력 방지
     if (numbers.length > 11) {
-      return editData.phone || '';
+      return formState.editData.phone || '';
     }
     
     // 전화번호 포맷팅 (13자리: 010-1234-5678)
@@ -107,18 +139,18 @@ const MyPageEditProfile = () => {
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
-    setUploadError('');
+    dispatch({ type: 'SET_UPLOAD_ERROR', payload: '' });
 
     if (!file) {
-      setSelectedFile(null);
-      setPreviewUrl('');
+      dispatch({ type: 'SET_SELECTED_FILE', payload: null });
+      dispatch({ type: 'SET_PREVIEW_URL', payload: '' });
       return;
     }
 
     // 파일 타입 검증
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
     if (!allowedTypes.includes(file.type)) {
-      setUploadError('JPG, PNG, GIF 파일만 업로드 가능합니다.');
+      dispatch({ type: 'SET_UPLOAD_ERROR', payload: 'JPG, PNG, GIF 파일만 업로드 가능합니다.' });
       event.target.value = '';
       return;
     }
@@ -126,44 +158,52 @@ const MyPageEditProfile = () => {
     // 파일 크기 검증 (5MB)
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      setUploadError('파일 크기는 5MB 이하로 업로드해주세요.');
+      dispatch({ type: 'SET_UPLOAD_ERROR', payload: '파일 크기는 5MB 이하로 업로드해주세요.' });
       event.target.value = '';
       return;
     }
 
-    setSelectedFile(file);
+    dispatch({ type: 'SET_SELECTED_FILE', payload: file });
 
     // 미리보기 생성
     const reader = new FileReader();
     reader.onload = (e) => {
-      setPreviewUrl(e.target.result);
+      dispatch({ type: 'SET_PREVIEW_URL', payload: e.target.result });
     };
     reader.readAsDataURL(file);
   };
 
   const uploadProfileImage = async () => {
-    if (!selectedFile) return null;
+    if (!formState.selectedFile) return null;
 
     try {
-      const result = await uploadMyProfileImage(selectedFile);
+      const result = await uploadImageMutation.mutateAsync(formState.selectedFile);
       console.log('이미지 업로드 성공:', result);
       return true;
     } catch (error) {
       console.error('이미지 업로드 중 오류:', error);
-      setUploadError('이미지 업로드 중 오류가 발생했습니다.');
+      dispatch({ type: 'SET_UPLOAD_ERROR', payload: '이미지 업로드 중 오류가 발생했습니다.' });
       return false;
     }
   };
 
   const validateForm = () => {
     // 전화번호가 입력되었다면 13자리 검증
-    if (editData.phone && editData.phone.length !== 13) {
-      setPhoneError('전화번호는 13자리로 입력해주세요. (예: 010-1234-5678)');
+    if (formState.editData.phone && formState.editData.phone.length !== 13) {
+      dispatch({ type: 'SET_PHONE_ERROR', payload: '전화번호는 13자리로 입력해주세요. (예: 010-1234-5678)' });
       return false;
     }
-    setPhoneError('');
+    dispatch({ type: 'SET_PHONE_ERROR', payload: '' });
     return true;
   };
+
+  const uploadImageMutation = useMutation({
+    mutationFn: uploadMyProfileImage,
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: updateMyProfile,
+  });
 
   const updateProfile = async () => {
     if (!validateForm()) {
@@ -173,7 +213,7 @@ const MyPageEditProfile = () => {
     try {
       // 먼저 이미지 업로드 (선택된 파일이 있는 경우)
       let imageUploadSuccess = true;
-      if (selectedFile) {
+      if (formState.selectedFile) {
         imageUploadSuccess = await uploadProfileImage();
         if (!imageUploadSuccess) {
           return; // 이미지 업로드 실패 시 프로필 업데이트 중단
@@ -182,37 +222,16 @@ const MyPageEditProfile = () => {
 
       // 프로필 정보 업데이트
       // 프로필 정보 업데이트
-      const data = await updateMyProfile({
-        name: editData.name,
-        email: editData.email,
-        phone: editData.phone,
-        address: `${editData.address} ${editData.detailAddress}`.trim()
+      await updateProfileMutation.mutateAsync({
+        name: formState.editData.name,
+        email: formState.editData.email,
+        phone: formState.editData.phone,
+        address: `${formState.editData.address} ${formState.editData.detailAddress}`.trim()
       });
-      console.log('서버 응답 데이터:', data);
-      
-      const { address, detailAddress } = parseAddress(data.address);
-      
-      // 프로필 상태 업데이트 (이미지가 업로드된 경우 새로 가져오기)
-      if (selectedFile) {
-        // 서버에서 업데이트된 프로필 정보를 다시 가져오기
-        await fetchProfile();
-      } else {
-        setProfile({
-          name: data.username || data.name,
-          email: data.email,
-          phone: data.phone,
-          address,
-          detailAddress,
-          imageUrl: profile.imageUrl // 기존 이미지 유지
-        });
-      }
+      await queryClient.invalidateQueries({ queryKey: ['mypage', 'profile'] });
       
       setEditMode(false);
-      setEditData({});
-      setPhoneError('');
-      setUploadError('');
-      setSelectedFile(null);
-      setPreviewUrl('');
+      dispatch({ type: 'RESET_AFTER_SAVE' });
 
       alert('프로필이 성공적으로 업데이트되었습니다.');
 
@@ -241,8 +260,8 @@ const MyPageEditProfile = () => {
 
   // 현재 표시할 이미지 URL 결정
   const getCurrentImageUrl = () => {
-    if (editMode && previewUrl) {
-      return previewUrl; // 새로 선택한 파일의 미리보기
+    if (editMode && formState.previewUrl) {
+      return formState.previewUrl; // 새로 선택한 파일의 미리보기
     }
     return profile.imageUrl; // 기존 프로필 이미지
   };
@@ -250,132 +269,25 @@ const MyPageEditProfile = () => {
   return (
     <div className="mypage-container">
       <div className="mypage-card">
-        <div className="mypage-header">
-          <h1>프로필 편집</h1>
-          {!editMode && (
-            <button onClick={startEdit} className="edit-button1">편집</button>
-          )}
-        </div>
+        <MyProfileEditHeader editMode={editMode} onStartEdit={startEdit} />
 
         <div className="profile-content">
-          {/* 프로필 이미지 섹션 */}
-          <div className="field-group">
-            <label>프로필 이미지</label>
-            <div className="profile-image-section">
-              <div className="current-image">
-                <img 
-                  src={getCurrentImageUrl()} 
-                  alt="프로필 이미지" 
-                  className="profile-image-preview"
-                />
-              </div>
-              
-              {editMode && (
-                <div className="image-upload-section">
-                  <div className="file-upload-container">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileSelect}
-                      accept="image/jpeg,image/jpg,image/png,image/gif"
-                      className="file-input"
-                      id="profile-image-input"
-                    />
-                    <label htmlFor="profile-image-input" className="file-upload-label">
-                      이미지 선택
-                    </label>
-                  </div>
-                  
-                  {selectedFile && (
-                    <div className="selected-file-info">
-                      <p>선택된 파일: {selectedFile.name}</p>
-                      <p>파일 크기: {(selectedFile.size / 1024 / 1024).toFixed(2)}MB</p>
-                    </div>
-                  )}
-                  
-                  {uploadError && (
-                    <div className="upload-error" style={{color: '#f44336', fontSize: '12px', marginTop: '4px'}}>
-                      {uploadError}
-                    </div>
-                  )}
-                  
-                  <p className="image-help-text">
-                    JPG, PNG, GIF 파일 (최대 5MB)<br/>
-                    이미지를 선택하지 않으면 기존 이미지가 유지됩니다.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+          <MyProfileImageSection
+            editMode={editMode}
+            currentImageUrl={getCurrentImageUrl()}
+            fileInputRef={fileInputRef}
+            onFileSelect={handleFileSelect}
+            selectedFile={formState.selectedFile}
+            uploadError={formState.uploadError}
+          />
 
-          {/* 기본 정보 필드들 */}
-          <div className="field-group">
-            <label>사용자명</label>
-            {editMode ? (
-              <input
-                type="text"
-                value={editData.name || ''}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder="사용자명을 입력하세요"
-              />
-            ) : (
-              <span>{profile.name || '설정되지 않음'}</span>
-            )}
-          </div>
-
-          <div className="field-group">
-            <label>이메일</label>
-            {editMode ? (
-              <input
-                type="email"
-                value={editData.email || ''}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="이메일을 입력하세요"
-                disabled
-              />
-            ) : (
-              <span>{profile.email || '설정되지 않음'}</span>
-            )}
-          </div>
-
-          <div className="field-group">
-            <label>전화번호</label>
-            {editMode ? (
-              <div>
-                <input
-                  type="tel"
-                  value={editData.phone || ''}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="010-1234-5678 ( - 제외하고 입력 )"
-                  maxLength="13"
-                />
-                {phoneError && (
-                  <small className="phone-error" style={{color: '#f44336', fontSize: '12px', marginTop: '4px', display: 'block'}}>
-                    {phoneError}
-                  </small>
-                )}
-              </div>
-            ) : (
-              <span>{profile.phone || '설정되지 않음'}</span>
-            )}
-          </div>
-
-          <div className="field-group">
-            <label>주소</label>
-            {editMode ? (
-              <AddressInput
-                address={editData.address || ''}
-                detailAddress={editData.detailAddress || ''}
-                onAddressChange={(address) => handleInputChange('address', address)}
-                onDetailAddressChange={(detailAddress) => handleInputChange('detailAddress', detailAddress)}
-                label=""
-                editMode={true}
-                className=""
-              />
-            ) : (
-              <span>{`${profile.address} ${profile.detailAddress}`.trim() || '설정되지 않음'}</span>
-            )}
-          </div>
+          <MyProfileFields
+            editMode={editMode}
+            profile={profile}
+            editData={formState.editData}
+            phoneError={formState.phoneError}
+            onInputChange={handleInputChange}
+          />
 
           <div className="bottom-section">
             <button 
@@ -387,20 +299,22 @@ const MyPageEditProfile = () => {
           </div>
         </div>
 
-        {editMode && (
-          <div className="action-buttons">
-            <button onClick={cancelEdit} className="cancel-button1">취소</button>
-            <button 
-              onClick={updateProfile} 
-              className="save-button"
-              disabled={!!phoneError || !!uploadError}
-            >
-              저장
-            </button>
-          </div>
-        )}
+        <MyProfileEditActions
+          editMode={editMode}
+          onCancel={cancelEdit}
+          onSave={updateProfile}
+          disabled={!!formState.phoneError || !!formState.uploadError}
+        />
       </div>
     </div>
+  );
+};
+
+const MyPageEditProfile = () => {
+  return (
+    <QueryClientProvider client={myProfileQueryClient}>
+      <MyPageEditProfileContent />
+    </QueryClientProvider>
   );
 };
 

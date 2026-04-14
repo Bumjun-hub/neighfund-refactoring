@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './FundPage.css';
 import Section from '../../components/Section';
-import FundCard from '../../components/FundCard';
-import SurveyBox from '../../components/SurveyBox';
 import { useNavigate } from 'react-router-dom';
 import { getFundList, getRoleInfo, getSurveyList } from './fundApi';
+import FundPageHeader from './components/FundPageHeader';
+import FundSurveySection from './components/FundSurveySection';
+import FundGridSection from './components/FundGridSection';
 
 const FundPage = () => {
 
@@ -106,62 +107,26 @@ const FundPage = () => {
   return (
     <Section>
       <div className="fund-page-wrapper">
-        <div className='fund-header'>
-          <h2 className="fund-title">펀딩</h2>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="write-btn" onClick={handleWriteClick}>+ 펀딩 글쓰기</button>
-            {isAdmin && (
-              <button className="write-btn" onClick={handleSurveyWriteClick}>+ 설문조사 글쓰기</button>
-            )}
-          </div>
-        </div>
-        {/* 설문조사 목록 */}
-        <div className="fund-surveys">
-          {surveysStatus === 'loading' && (
-            <p className="fund-page-status fund-page-status--loading">설문조사를 불러오는 중입니다...</p>
-          )}
-          {surveysStatus === 'error' && (
-            <div className="fund-page-status fund-page-status--error" role="alert">
-              <p>설문조사를 불러오지 못했습니다.</p>
-              <button type="button" className="fund-page-retry-btn" onClick={loadSurveys}>다시 시도</button>
-            </div>
-          )}
-          {surveysStatus === 'ready' && surveys.map((survey) => (
-              <SurveyBox
-                key={survey.surveyId}
-                question={survey.title}
-                options={survey.options}
-                surveyId={survey.surveyId}
-                voted={survey.voted}
-                totalCount={survey.totalCount}
-                setSurveys={setSurveys}
-                surveys={surveys}
-              />
-            ))}
-        </div>
+        <FundPageHeader
+          isAdmin={isAdmin}
+          onWriteClick={handleWriteClick}
+          onSurveyWriteClick={handleSurveyWriteClick}
+        />
 
-        {/* 펀딩 카드 목록  */}
-        <div className="fund-grid">
-          {fundsStatus === 'loading' && (
-            <div className="fund-page-status fund-page-status--loading">펀딩 목록을 불러오는 중입니다...</div>
-          )}
-          {fundsStatus === 'error' && (
-            <div className="fund-page-status fund-page-status--error" role="alert">
-              <p>펀딩 목록을 불러오지 못했습니다.</p>
-              <button type="button" className="fund-page-retry-btn" onClick={loadFunds}>다시 시도</button>
-            </div>
-          )}
-          {fundsStatus === 'ready' && Array.isArray(funds) && funds.length === 0 && (
-            <div className="fund-page-status">진행 중인 펀딩이 없습니다.</div>
-          )}
-          {fundsStatus === 'ready' && Array.isArray(funds) &&
-            funds.slice(0, visibleCount).map((fund) => {
-              console.log("펀딩 항목:", fund);
-              return <FundCard key={fund.id} fund={fund} />;
-            })}
-        </div>
+        <FundSurveySection
+          surveysStatus={surveysStatus}
+          surveys={surveys}
+          setSurveys={setSurveys}
+          onRetry={loadSurveys}
+        />
 
-        {/* 무한 스크롤 */}
+        <FundGridSection
+          fundsStatus={fundsStatus}
+          funds={funds}
+          visibleCount={visibleCount}
+          onRetry={loadFunds}
+        />
+
         <div ref={observerRef} style={{ height: 1 }}></div>
       </div>
     </Section>
