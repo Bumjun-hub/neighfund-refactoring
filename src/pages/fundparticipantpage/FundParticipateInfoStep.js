@@ -1,6 +1,7 @@
 import AddressInput from "../memberpage/AddressInput";
 import { useState } from "react";
 import './FundParticipatePage.css';
+import { createFundOrder } from "../fundpage/fundApi";
 
 
 const FundParticipateInfoStep = ({ form, setForm, onNext, onPrev, optionId, salePrice }) => {
@@ -35,34 +36,23 @@ const FundParticipateInfoStep = ({ form, setForm, onNext, onPrev, optionId, sale
 
     try {
       const token = localStorage.getItem("accessToken");
-      const res = await fetch(`/api/orders/${optionId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          quantity: Number(form.quantity),
-          name: form.name,
-          address: form.address,
-          detailAddress: form.detailAddress,
-          phone: form.phone,
-          paymentName: form.paymentName,
-          paymentBank: form.paymentBank
-        }),
-      });
+      await createFundOrder(optionId, {
+        quantity: Number(form.quantity),
+        name: form.name,
+        address: form.address,
+        detailAddress: form.detailAddress,
+        phone: form.phone,
+        paymentName: form.paymentName,
+        paymentBank: form.paymentBank
+      }, token);
 
       setLoading(false);
-      if (res.ok) {
-        alert("🎉 참여 신청이 완료되었습니다!");
-        onNext();
-      } else {
-        const msg = await res.text();
-        alert("❌ 신청 실패: " + msg);
-      }
+      alert("🎉 참여 신청이 완료되었습니다!");
+      onNext();
     } catch (err) {
       setLoading(false);
-      alert("⚠️ 네트워크 오류: " + err.message);
+      const message = err?.data?.message || err?.message || "요청에 실패했습니다.";
+      alert("❌ 신청 실패: " + message);
     }
   };
 

@@ -1,9 +1,11 @@
+import { httpClient, setAuthRefreshHandler } from '../api/httpClient';
+
 /**
  * 로그아웃 함수
  */
 export const logout = async () => {
     try {
-        const response = await fetch('http://localhost:8080/api/auth/logout', {
+        const response = await fetch('/api/auth/logout', {
             method: 'POST',
             credentials: 'include', // 쿠키 포함
         });
@@ -26,30 +28,13 @@ export const logout = async () => {
  * 인증이 필요한 API 요청을 위한 fetch 래퍼
  */
 export const authenticatedFetch = async (url, options = {}) => {
-    const defaultOptions = {
-        credentials: 'include', // 쿠키 자동 포함
-        headers: {
-            'Content-Type': 'application/json',
-            ...options.headers,
-        },
-        ...options,
-    };
-
     try {
-        const response = await fetch(url, defaultOptions);
+        const response = await httpClient.requestAuthResponse(url, options);
 
-        // 401 Unauthorized인 경우 토큰 갱신 시도
+        // 최종 인증 실패(401) 시 로그인 페이지로 이동
         if (response.status === 401) {
-            const refreshResult = await refreshToken();
-            
-            if (refreshResult) {
-                // 토큰 갱신 성공 시 원래 요청 재시도
-                return await fetch(url, defaultOptions);
-            } else {
-                // 토큰 갱신 실패 시 로그인 페이지로 리다이렉트
-                window.location.href = '/login';
-                throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
-            }
+            window.location.href = '/login';
+            throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
         }
 
         return response;
@@ -65,8 +50,8 @@ export const authenticatedFetch = async (url, options = {}) => {
 export const refreshToken = async () => {
     try {
         console.log('🔄 refreshToken 함수 시작');
-        
-        const response = await fetch('http://localhost:8080/api/auth/refresh', {
+
+        const response = await fetch('/api/auth/refresh', {
             method: 'POST',
             credentials: 'include',
         });
@@ -87,6 +72,9 @@ export const refreshToken = async () => {
     }
 };
 
+// authenticatedFetch가 사용하는 401 재시도 엔진에 refresh 함수를 연결한다.
+setAuthRefreshHandler(refreshToken);
+
 /**
  * 사용자 인증 상태 확인 함수
  * 보호된 엔드포인트를 호출해서 인증 상태를 확인
@@ -94,11 +82,9 @@ export const refreshToken = async () => {
 export const checkAuthStatus = async () => {
     try {
         console.log('🔍 checkAuthStatus 시작');
-        
-        // ✅ 일반 fetch 사용 (authenticatedFetch 사용 안함)
-        const response = await fetch('http://localhost:8080/api/auth/mypage', {
+
+        const response = await httpClient.requestAuthResponse('/api/auth/mypage', {
             method: 'GET',
-            credentials: 'include',
         });
 
         console.log('🔍 checkAuthStatus 응답:', response.status);
@@ -108,31 +94,10 @@ export const checkAuthStatus = async () => {
             console.log('✅ checkAuthStatus 성공');
             return { isAuthenticated: true, user: userData };
         } else if (response.status === 401) {
-            console.log('🔄 checkAuthStatus - 401 에러, 토큰 갱신 시도');
-            
-            // 토큰 갱신 시도
-            const refreshResult = await refreshToken();
-            console.log('🔄 checkAuthStatus - 토큰 갱신 결과:', refreshResult);
-            
-            if (refreshResult) {
-                // 재시도 (여전히 일반 fetch 사용)
-                const retryResponse = await fetch('http://localhost:8080/api/auth/mypage', {
-                    method: 'GET',
-                    credentials: 'include',
-                });
-                
-                console.log('🔄 checkAuthStatus - 재시도 응답:', retryResponse.status);
-                
-                if (retryResponse.ok) {
-                    const userData = await retryResponse.json();
-                    console.log('✅ checkAuthStatus 재시도 성공');
-                    return { isAuthenticated: true, user: userData };
-                }
-            }
             console.log('❌ checkAuthStatus - 토큰 갱신 실패');
             return { isAuthenticated: false, user: null };
         }
-        
+
         console.log('❌ checkAuthStatus - 기타 오류');
         return { isAuthenticated: false, user: null };
     } catch (error) {
@@ -146,12 +111,12 @@ export const checkAuthStatus = async () => {
  */
 export const changePassword = async (currentPassword, newPassword) => {
     try {
-        const response = await authenticatedFetch('http://localhost:8080/api/auth/changedPwd', {
+        const response = await authenticatedFetch('/api/auth/changedPwd', {
             method: 'PUT',
-            body: JSON.stringify({
+            body: {
                 currentPassword,
                 newPassword
-            }),
+            },
         });
 
         const data = await response.json();
@@ -172,7 +137,7 @@ export const changePassword = async (currentPassword, newPassword) => {
  */
 export const deleteAccount = async () => {
     try {
-        const response = await authenticatedFetch('http://localhost:8080/api/auth/deletion', {
+        const response = await authenticatedFetch('/api/auth/deletion', {
             method: 'DELETE',
         });
 

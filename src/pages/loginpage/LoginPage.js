@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { checkAuthStatus } from '../../utils/authUtils';
+import { httpClient } from '../../api/httpClient';
 import './LoginPage.css';
 import '../memberpage/MemberPage.css';
 
@@ -36,9 +37,9 @@ const LoginPage = () => {
     // 소셜 로그인 핸들러
     const handleSocialLogin = (provider) => {
         const socialLoginUrls = {
-            google: 'http://localhost:8080/oauth2/authorization/google',
-            kakao: 'http://localhost:8080/oauth2/authorization/kakao',
-            naver: 'http://localhost:8080/oauth2/authorization/naver'
+            google: '/oauth2/authorization/google',
+            kakao: '/oauth2/authorization/kakao',
+            naver: '/oauth2/authorization/naver'
         };
         
         window.location.href = socialLoginUrls[provider];
@@ -61,32 +62,20 @@ const LoginPage = () => {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:8080/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    email: formData.email,
-                    password: formData.password
-                }),
+            const data = await httpClient.post('/api/auth/login', {
+                email: formData.email,
+                password: formData.password
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
+            if (data) {
                 console.log('로그인 성공:', data);
                 window.dispatchEvent(new Event('authChange'));
                 setTimeout(() => {
                     navigate('/', { replace: true });
                 }, 200);
-            } else {
-                setError(data.message || '로그인에 실패했습니다.');
             }
         } catch (error) {
             console.error('로그인 오류:', error);
-            setError('서버 연결에 실패했습니다.');
+            setError(error?.data?.message || error?.message || '서버 연결에 실패했습니다.');
         } finally {
             setLoading(false);
         }

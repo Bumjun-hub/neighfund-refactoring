@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import './SurveyWritePage.css';
 import { useNavigate } from 'react-router-dom';
 import Section from '../../components/Section';
-import { refreshToken } from '../../utils/authUtils';
+import { authenticatedFetch } from '../../utils/authUtils';
 
 const SurveyWritePage = () => {
     const [question, setQuestion] = useState('');
@@ -16,14 +16,7 @@ const SurveyWritePage = () => {
         const checkAdmin = async () => {
             setAuthStatus('loading');
             try {
-                let res = await fetch("/api/auth/roleinfo", { credentials: "include" });
-
-                if (res.status === 401) {
-                    const refreshed = await refreshToken();
-                    if (refreshed) {
-                        res = await fetch("/api/auth/roleinfo", { credentials: "include" });
-                    }
-                }
+                const res = await authenticatedFetch("/api/auth/roleinfo", { method: 'GET' });
 
                 const data = await res.json();
                 if (data.roleName === "ROLE_ADMIN") {
@@ -60,16 +53,12 @@ const SurveyWritePage = () => {
         if (isSubmitting) return;
         setIsSubmitting(true);
         try {
-            const res = await fetch('/api/survey/admin/write', {
+            const res = await authenticatedFetch('/api/survey/admin/write', {
                 method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+                body: {
                     title: question,
                     options,
-                }),
+                },
             });
 
             if (res.ok) {

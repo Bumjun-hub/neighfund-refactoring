@@ -4,6 +4,7 @@ import './FundInfoPage.css';
 import './Modal.css';
 import Section from '../../components/Section';
 import FundParticipatePage from '../fundparticipantpage/FundParticipatePage.js'; //  참여 컴포넌트 import
+import { deleteFund, getFundDetail, getMyOrderList, getRoleInfo } from './fundApi';
 
 const FundInfoPage = () => {
     const { id } = useParams();
@@ -52,19 +53,14 @@ const FundInfoPage = () => {
         }
 
         try {
-            const res = await fetch("/api/auth/roleinfo", {
-                method: "GET",
-                credentials: "include",
-            });
-
-            if (!res.ok) {
+            await getRoleInfo();
+            setShowModal(true); //  창 대신 모달 열기
+        } catch (error) {
+            if (error?.status === 401) {
                 alert("로그인이 필요한 기능입니다.");
                 window.location.href = "/login";
                 return;
             }
-
-            setShowModal(true); //  창 대신 모달 열기
-        } catch (error) {
             alert("서버 오류가 발생했습니다.");
             console.error("참여 버튼 오류:", error);
         }
@@ -73,8 +69,7 @@ const FundInfoPage = () => {
 
     // ✅ 관리자 여부 확인
     useEffect(() => {
-        fetch("/api/auth/roleinfo", { credentials: "include" })
-            .then(res => res.json())
+        getRoleInfo()
             .then(data => {
                 if (data.roleName === "ROLE_ADMIN") setIsAdmin(true);
             })
@@ -87,14 +82,7 @@ const FundInfoPage = () => {
 
         try {
             const token = localStorage.getItem("accessToken");
-            const res = await fetch(`/api/fund/delete/${id}`, {
-                method: "DELETE",
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-
-            if (!res.ok) throw new Error("삭제 실패");
+            await deleteFund(id, token);
 
             alert("삭제가 완료되었습니다.");
             navigate("/funding"); // 목록 페이지로 이동
@@ -111,18 +99,7 @@ const FundInfoPage = () => {
         (async () => {
             setOrdersFetchError(null);
             try {
-                const res = await fetch("/api/orders/myPage/order", {
-                    method: "GET",
-                    credentials: "include",
-                });
-                if (!res.ok) {
-                    if (!cancelled) {
-                        setMyOrderOptionIds([]);
-                        setOrdersFetchError("신청한 리워드 정보를 불러오지 못했습니다.");
-                    }
-                    return;
-                }
-                const data = await res.json();
+                const data = await getMyOrderList();
                 if (cancelled) return;
                 const list = Array.isArray(data) ? data : [];
                 const optionIds = list.map((order) => order.optionId);
@@ -148,16 +125,7 @@ const FundInfoPage = () => {
         setFundFetchStatus('loading');
         setFund(null);
         try {
-            const res = await fetch(`/api/fund/view/${id}`);
-            if (res.status === 404) {
-                setFundFetchStatus('notFound');
-                return;
-            }
-            if (!res.ok) {
-                setFundFetchStatus('error');
-                return;
-            }
-            const data = await res.json();
+            const data = await getFundDetail(id);
             if (data == null || typeof data !== 'object') {
                 setFundFetchStatus('notFound');
                 return;
@@ -165,6 +133,10 @@ const FundInfoPage = () => {
             setFund(data);
             setFundFetchStatus('ready');
         } catch (e) {
+            if (e?.status === 404) {
+                setFundFetchStatus('notFound');
+                return;
+            }
             console.error("❌ 상세 불러오기 실패:", e);
             setFundFetchStatus('error');
         }

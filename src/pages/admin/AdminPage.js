@@ -5,6 +5,7 @@ import CommunityAdminTab from './CommunityAdminTab';
 import SurveyAdminTab from './SurveyAdminTab';
 import OrderAdminTab from './OrderAdminTab';
 import GatheringAdminTab from './GatheringAdminTab';
+import { httpClient } from '../../api/httpClient';
 
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('fund'); // 현재 탭
@@ -52,18 +53,9 @@ const AdminPage = () => {
     setTabError((prev) => ({ ...prev, [tabKey]: message }));
   };
 
-  const safeFetchJson = async (url, options = {}, fallbackMessage = '데이터 요청에 실패했습니다.') => {
-    const res = await fetch(url, options);
-    if (!res.ok) {
-      throw new Error(`${fallbackMessage} (HTTP ${res.status})`);
-    }
-    return res.json();
-  };
-
   // 관리자 인증
   useEffect(() => {
-    fetch("/api/auth/roleinfo", { credentials: "include" })
-      .then(res => res.json())
+    httpClient.get("/api/auth/roleinfo")
       .then(data => {
         if (data.roleName !== "ROLE_ADMIN") {
           alert("관리자만 접근 가능합니다.");
@@ -95,8 +87,8 @@ const AdminPage = () => {
     setTabLoading('fund');
     try {
       const [pendingData, approvedData] = await Promise.all([
-        safeFetchJson('/api/fund/admin/unapproved', {}, '미승인 펀딩 목록 조회 실패'),
-        safeFetchJson('/api/fund/view', {}, '승인 펀딩 목록 조회 실패'),
+        httpClient.get('/api/fund/admin/unapproved'),
+        httpClient.get('/api/fund/view'),
       ]);
       setUnapprovedFunds(Array.isArray(pendingData) ? pendingData : []);
       setApprovedFunds(Array.isArray(approvedData) ? approvedData : []);
@@ -112,7 +104,7 @@ const AdminPage = () => {
   const fetchCommunityPosts = async () => {
     setTabLoading('community');
     try {
-      const data = await safeFetchJson('/api/community/view', { credentials: 'include' }, '제안 게시판 조회 실패');
+      const data = await httpClient.get('/api/community/view');
       setCommunityPosts(Array.isArray(data) ? data : []);
       setTabReady('community');
     } catch (err) {
@@ -125,7 +117,7 @@ const AdminPage = () => {
   const fetchSurveys = async () => {
     setTabLoading('survey');
     try {
-      const data = await safeFetchJson("/api/survey/admin/view", { credentials: "include" }, '설문 목록 조회 실패');
+      const data = await httpClient.get("/api/survey/admin/view");
       setSurveys(Array.isArray(data) ? data : []);
       setTabReady('survey');
     } catch (err) {
@@ -137,7 +129,7 @@ const AdminPage = () => {
 
   const fetchFundTitles = async () => {
     try {
-      const data = await safeFetchJson("/api/fund/titles", {}, '펀딩 제목 목록 조회 실패');
+      const data = await httpClient.get("/api/fund/titles");
       setFunds(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
@@ -148,7 +140,7 @@ const AdminPage = () => {
   const fetchOrders = async () => {
     setTabLoading('orders');
     try {
-      const data = await safeFetchJson('/api/orders/admin/order', { credentials: 'include' }, '주문 목록 조회 실패');
+      const data = await httpClient.get('/api/orders/admin/order');
       setOrders(Array.isArray(data) ? data : []);
       setTabReady('orders');
     } catch (err) {
@@ -161,7 +153,7 @@ const AdminPage = () => {
   const fetchOrdersByFund = async (fundId) => {
     setTabLoading('orders');
     try {
-      const data = await safeFetchJson(`/api/orders/admin/byFund/${fundId}`, { credentials: 'include' }, '펀딩별 주문 조회 실패');
+      const data = await httpClient.get(`/api/orders/admin/byFund/${fundId}`);
       setOrders(Array.isArray(data) ? data : []);
       setTabReady('orders');
     } catch (err) {
@@ -176,49 +168,35 @@ const AdminPage = () => {
     const endpoint = fundMode === 'unapproved'
       ? `/api/fund/admin/unapproved/${fund.id}`
       : `/api/fund/view/${fund.id}`;
-
-    const res = await fetch(endpoint);
-    setSelectedFund(await res.json());
+    const data = await httpClient.get(endpoint);
+    setSelectedFund(data);
   };
 
   const handleApprove = async (fundId) => {
-    await fetch(`/api/fund/admin/approve/${fundId}`, { method: 'PUT' });
+    await httpClient.put(`/api/fund/admin/approve/${fundId}`);
     alert('승인 완료!');
     await fetchFunds();
     setSelectedFund(null);
   };
 
   const handleCommunityStatusChange = async (id, newStatus) => {
-    await fetch(`/api/community/admin/edit/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    });
+    await httpClient.put(`/api/community/admin/edit/${id}`, { status: newStatus });
     fetchCommunityPosts();
   };
 
   const handleSurveyVisibleChange = async (id, newVisible) => {
-    await fetch(`/api/survey/admin/status/${id}?visible=${newVisible}`, {
-      method: 'PUT',
-      credentials: 'include',
-    });
+    await httpClient.put(`/api/survey/admin/status/${id}?visible=${newVisible}`);
     fetchSurveys();
   };
 
   const handleOrderStatusChange = async (orderId, newStatus) => {
-    await fetch(`/api/orders/admin/${orderId}/status?status=${newStatus}`, {
-      method: 'PUT',
-      credentials: 'include',
-    });
+    await httpClient.put(`/api/orders/admin/${orderId}/status?status=${newStatus}`);
     fetchOrders();
   };
 
   const handleGatheringDelete = async (id) => {
     if (!window.confirm("정말 이 소모임을 삭제할까요?")) return;
-    await fetch(`/api/gatherings/free/delete/${id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    });
+    await httpClient.delete(`/api/gatherings/free/delete/${id}`);
     alert('소모임이 삭제되었습니다!');
     // 삭제 후 소모임 목록 다시 불러오기
     fetchGatherings();
@@ -227,7 +205,7 @@ const AdminPage = () => {
   const fetchGatherings = async () => {
     setTabLoading('gathering');
     try {
-      const data = await safeFetchJson('/api/gatherings/free/list', { credentials: 'include' }, '소모임 목록 조회 실패');
+      const data = await httpClient.get('/api/gatherings/free/list');
       setGatherings(Array.isArray(data) ? data : []);
       setTabReady('gathering');
     } catch (err) {

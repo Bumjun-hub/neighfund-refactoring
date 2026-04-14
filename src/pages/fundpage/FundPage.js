@@ -4,6 +4,7 @@ import Section from '../../components/Section';
 import FundCard from '../../components/FundCard';
 import SurveyBox from '../../components/SurveyBox';
 import { useNavigate } from 'react-router-dom';
+import { getFundList, getRoleInfo, getSurveyList } from './fundApi';
 
 const FundPage = () => {
 
@@ -39,11 +40,7 @@ const FundPage = () => {
   const loadFunds = useCallback(async () => {
     setFundsStatus('loading');
     try {
-      const res = await fetch("/api/fund/view");
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const data = await res.json();
+      const data = await getFundList();
       console.log("🔥 받아온 펀딩 목록:", data);
       if (Array.isArray(data)) {
         setFunds(data);
@@ -80,10 +77,7 @@ const FundPage = () => {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/roleinfo", {
-      credentials: "include"
-    })
-      .then(res => res.json())
+    getRoleInfo()
       .then(data => {
         if (data.roleName === "ROLE_ADMIN") setIsAdmin(true);
       })
@@ -94,11 +88,7 @@ const FundPage = () => {
   const loadSurveys = useCallback(async () => {
     setSurveysStatus('loading');
     try {
-      const res = await fetch("/api/survey/view", { credentials: 'include' });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const data = await res.json();
+      const data = await getSurveyList();
       console.log("🧪 설문 목록:", data);
       setSurveys(Array.isArray(data) ? data : []);
       setSurveysStatus('ready');

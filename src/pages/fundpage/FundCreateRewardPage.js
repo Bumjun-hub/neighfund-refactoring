@@ -3,6 +3,7 @@ import FundCreateLayout from './FundCreateLayout';
 import './FundCreateRewardPage.css';
 import { useFunding } from './FundingProvider';
 import { useNavigate } from 'react-router-dom';
+import { createFund } from './fundApi';
 
 const FundCreateRewardPage = () => {
   const navigate = useNavigate();
@@ -78,17 +79,7 @@ const FundCreateRewardPage = () => {
     const token = localStorage.getItem("accessToken");
 
     try {
-      const response = await fetch("http://localhost:3000/api/fund/write", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`서버 오류 발생 (HTTP ${response.status})`);
-      }
+      await createFund(formData, token);
 
       alert("펀딩 등록 성공!");
       navigate("/funding/")

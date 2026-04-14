@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import './CheckPw.css';
 import { AiFillEye, AiFillEyeInvisible } from "react-icons/ai";
+import { authenticatedFetch } from '../../utils/authUtils';
 
-const CheckPw = ({ onPasswordVerified, onCancel, authenticatedFetch }) => {
+const CheckPw = ({ onPasswordVerified, onCancel }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -11,26 +12,10 @@ const CheckPw = ({ onPasswordVerified, onCancel, authenticatedFetch }) => {
   // 비밀번호 확인 API 호출 함수
   const verifyPassword = async (inputPassword) => {
     try {
-      let response;
-      
-      if (authenticatedFetch) {
-        response = await authenticatedFetch('http://localhost:8080/api/auth/mypage/checkPwd', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ password: inputPassword })
-        });
-      } else {
-        response = await fetch('http://localhost:8080/api/auth/mypage/checkPwd', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ password: inputPassword })
-        });
-      }
+      const response = await authenticatedFetch('/api/auth/mypage/checkPwd', {
+        method: 'POST',
+        body: { password: inputPassword }
+      });
 
       if (response.ok) {
         return true;

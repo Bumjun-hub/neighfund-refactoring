@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AddressInput from './AddressInput'; 
+import { httpClient } from '../../api/httpClient';
 import './MemberPage.css';
 
 const MemberPage = () => {
@@ -124,33 +125,22 @@ const MemberPage = () => {
         setLoading(true);
 
         try {
-            const response = await fetch('http://localhost:8080/api/auth/signup', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: formData.email,
-                    username: formData.username,
-                    password: formData.password,
-                    confirmPassword: formData.confirmPassword,
-                    address: formData.address + ' ' + formData.detailAddress,
-                    phone: formData.phone
-                }),
+            const data = await httpClient.post('/api/auth/signup', {
+                email: formData.email,
+                username: formData.username,
+                password: formData.password,
+                confirmPassword: formData.confirmPassword,
+                address: formData.address + ' ' + formData.detailAddress,
+                phone: formData.phone
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
+            if (data) {
                 console.log('회원가입 성공:', data);
                 alert('회원가입이 완료되었습니다!');
                 navigate('/login');
-            } else {
-                setError(data.message || '회원가입에 실패했습니다.');
             }
         } catch (error) {
             console.error('회원가입 오류:', error);
-            setError('서버 연결에 실패했습니다.');
+            setError(error?.data?.message || error?.message || '서버 연결에 실패했습니다.');
         } finally {
             setLoading(false);
         }

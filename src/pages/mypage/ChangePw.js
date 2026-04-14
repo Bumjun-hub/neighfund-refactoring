@@ -74,9 +74,9 @@ const ChangePw = ({ onClose, onSuccess }) => {
         };
 
         try {
-            const response = await authenticatedFetch('http://localhost:8080/api/auth/changedPwd', {
+            const response = await authenticatedFetch('/api/auth/changedPwd', {
                 method: 'PUT',
-                body: JSON.stringify(requestBody),
+                body: requestBody,
             });
 
             if (response.ok) {
@@ -84,16 +84,19 @@ const ChangePw = ({ onClose, onSuccess }) => {
                 onSuccess && onSuccess();
                 onClose();
             } else {
-                const contentType = response.headers.get('content-type');
-                let errorData;
-                
-                if (contentType && contentType.includes('application/json')) {
-                    errorData = await response.json();
-                } else {
-                    errorData = { message: await response.text() };
+                let errorMessage = '비밀번호 변경에 실패했습니다.';
+                const rawBody = await response.text();
+
+                if (rawBody) {
+                    try {
+                        const parsed = JSON.parse(rawBody);
+                        errorMessage = parsed?.message || rawBody;
+                    } catch {
+                        errorMessage = rawBody;
+                    }
                 }
-                
-                setErrors({ submit: errorData.message || '비밀번호 변경에 실패했습니다.' });
+
+                setErrors({ submit: errorMessage });
             }
         } catch (error) {
             setErrors({ submit: '서버 연결에 실패했습니다.' });
@@ -117,7 +120,6 @@ const ChangePw = ({ onClose, onSuccess }) => {
             <CheckPw
                 onPasswordVerified={handlePasswordVerified}
                 onCancel={handlePasswordCheckCancel}
-                authenticatedFetch={authenticatedFetch}
             />
         );
     }

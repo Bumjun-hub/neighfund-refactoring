@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import VendorGatheringDetail from './VendorGatheringDetail';
 import './ClassListPage.css';
+import { getVendorClassList } from './vendorGatheringApi';
 
 const ClassListPage = () => {
   const [classes, setClasses] = useState([]);
@@ -88,16 +89,7 @@ const ClassListPage = () => {
     setLoading(true);
     setFetchError('');
     try {
-      const response = await fetch('/api/gatherings/vendor/list', {
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`목록 조회 실패 (HTTP ${response.status})`);
-      }
-      
-      const data = await response.json();
+      const data = await getVendorClassList();
       
       // confirmed가 true인 승인된 클래스만 필터링하고 한글 카테고리 추가
       const approvedClasses = Array.isArray(data) ? 

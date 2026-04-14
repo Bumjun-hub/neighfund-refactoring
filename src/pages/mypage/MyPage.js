@@ -6,7 +6,7 @@ import CheckPw from './CheckPw.js';
 import ChangePw from './ChangePw.js';
 import MyPosts from './MyPosts';
 import { PiFinnTheHumanBold } from "react-icons/pi";
-import { authenticatedFetch } from '../../utils/authUtils';
+import { httpClient } from '../../api/httpClient';
 import { useAuth } from '../../utils/AuthProvider';
 
 const MyPage = () => {
@@ -83,24 +83,16 @@ const MyPage = () => {
     const fetchUserInfo = useCallback(async () => {
         setProfileStatus('loading');
         try {
-            const response = await authenticatedFetch('http://localhost:8080/api/auth/mypage', {
-                method: 'GET',
+            const data = await httpClient.get('/api/auth/mypage');
+
+            setUserInfo({
+                username: data.username || data.name,
+                email: data.email,
+                phone: data.phone,
+                address: data.address,
+                profileImage: data.imageUrl 
             });
-            
-            if (response.ok) {
-                const data = await response.json();
-                
-                setUserInfo({
-                    username: data.username || data.name,
-                    email: data.email,
-                    phone: data.phone,
-                    address: data.address,
-                    profileImage: data.imageUrl 
-                });
-                setProfileStatus('ready');
-            } else {
-                setProfileStatus('error');
-            }
+            setProfileStatus('ready');
         } catch (error) {
             console.error('MyPage: 사용자 정보 로드 실패:', error);
             setProfileStatus('error');

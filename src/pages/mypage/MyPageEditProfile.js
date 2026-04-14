@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import AddressInput from '../memberpage/AddressInput'; 
 import './MyPageEditProfile.css';
 import { deleteAccount } from '../../utils/authUtils';
+import { getMyProfile, uploadMyProfileImage, updateMyProfile } from './mypageApi';
 
 const MyPageEditProfile = () => {
   const [profile, setProfile] = useState({
@@ -33,25 +34,17 @@ const MyPageEditProfile = () => {
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch('/api/auth/mypage', {
-        method: 'GET',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
+      const data = await getMyProfile();
+      const { address, detailAddress } = parseAddress(data.address);
+
+      setProfile({
+        name: data.username || data.name,
+        email: data.email,
+        phone: data.phone,
+        address,
+        detailAddress,
+        imageUrl: data.imageUrl || '/static/profileimages/profile1.jpg'
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const { address, detailAddress } = parseAddress(data.address);
-        
-        setProfile({
-          name: data.username || data.name,
-          email: data.email,
-          phone: data.phone,
-          address,
-          detailAddress,
-          imageUrl: data.imageUrl || '/static/profileimages/profile1.jpg'  
-        });
-      }
     } catch (err) {
       console.error('프로필 로드 실패:', err);
     }
@@ -152,26 +145,9 @@ const MyPageEditProfile = () => {
     if (!selectedFile) return null;
 
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-
-      const response = await fetch('/api/auth/mypage/upload', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
-      });
-
-      if (response.ok) {
-        // 업로드 성공 후 새로운 이미지 URL 반환 (서버에서 반환하는 경우)
-        const result = await response.text();
-        console.log('이미지 업로드 성공:', result);
-        return true;
-      } else {
-        const errorText = await response.text();
-        console.error('이미지 업로드 실패:', errorText);
-        setUploadError('이미지 업로드에 실패했습니다.');
-        return false;
-      }
+      const result = await uploadMyProfileImage(selectedFile);
+      console.log('이미지 업로드 성공:', result);
+      return true;
     } catch (error) {
       console.error('이미지 업로드 중 오류:', error);
       setUploadError('이미지 업로드 중 오류가 발생했습니다.');
@@ -205,27 +181,13 @@ const MyPageEditProfile = () => {
       }
 
       // 프로필 정보 업데이트
-      const profileResponse = await fetch('/api/auth/mypage/editProfile', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editData.name,
-          email: editData.email,
-          phone: editData.phone,
-          address: `${editData.address} ${editData.detailAddress}`.trim()
-        })
+      // 프로필 정보 업데이트
+      const data = await updateMyProfile({
+        name: editData.name,
+        email: editData.email,
+        phone: editData.phone,
+        address: `${editData.address} ${editData.detailAddress}`.trim()
       });
-
-      if (!profileResponse.ok) {
-        const errorText = await profileResponse.text();
-        console.error('프로필 업데이트 실패:', errorText);
-        alert('프로필 업데이트에 실패했습니다.');
-        return;
-      }
-
-      // 성공 처리
-      const data = await profileResponse.json();
       console.log('서버 응답 데이터:', data);
       
       const { address, detailAddress } = parseAddress(data.address);

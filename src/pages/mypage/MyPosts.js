@@ -1,6 +1,6 @@
 // MyPosts.js
 import React, { useState, useEffect } from 'react';
-import { authenticatedFetch } from '../../utils/authUtils';
+import { httpClient } from '../../api/httpClient';
 import SuggestionCard from '../../components/SuggestionCard';
 import GatheringCard from '../../components/GatheringCard';
 import FundCard from '../../components/FundCard';
@@ -37,29 +37,30 @@ const MyPosts = () => {
     // 유저 프로필 정보 불러오기  // 변경됨
     const fetchUserInfo = async () => {
         try {
-            const res = await authenticatedFetch('/api/auth/mypage', { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setUserInfo(data);
-            }
+            const data = await httpClient.get('/api/auth/mypage');
+            setUserInfo(data);
         } catch (e) {
             setUserInfo(null);
+        }
+    };
+
+    const fetchList = async (url) => {
+        try {
+            const data = await httpClient.get(url);
+            return Array.isArray(data) ? data : [];
+        } catch {
+            return [];
         }
     };
 
     const fetchAllMyPosts = async () => {
         setLoading(true);
         try {
-            const myCommunity = await authenticatedFetch('/api/community/myPosts', { credentials: 'include' });
-            setMyCommunityPosts(myCommunity.ok ? await myCommunity.json() : []);
-            const myLiked = await authenticatedFetch('/api/community/myLiked', { credentials: 'include' });
-            setLikedPosts(myLiked.ok ? await myLiked.json() : []);
-            const myOrders = await authenticatedFetch('/api/orders/myPage/order', { credentials: 'include' });
-            setParticipatedFunds(myOrders.ok ? await myOrders.json() : []);
-            const gatheringsRes = await authenticatedFetch('/api/gatherings/free/myParticipation', { credentials: 'include' });
-            setParticipatedGatherings(gatheringsRes.ok ? await gatheringsRes.json() : []);
-            const myReservationsRes = await authenticatedFetch('/api/gatherings/vendor/myPage/reservation', { credentials: 'include' });
-            setMyReservations(myReservationsRes.ok ? await myReservationsRes.json() : []);
+            setMyCommunityPosts(await fetchList('/api/community/myPosts'));
+            setLikedPosts(await fetchList('/api/community/myLiked'));
+            setParticipatedFunds(await fetchList('/api/orders/myPage/order'));
+            setParticipatedGatherings(await fetchList('/api/gatherings/free/myParticipation'));
+            setMyReservations(await fetchList('/api/gatherings/vendor/myPage/reservation'));
         
         
         } catch (e) {

@@ -2,8 +2,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCallback, useState, useEffect } from 'react';
 import './Header.css';
 import { IoIosNotificationsOutline } from "react-icons/io";
-import { logout } from '../utils/authUtils';
+import { checkAuthStatus, logout } from '../utils/authUtils';
 import { connectNotification, disconnectNotification } from '../utils/notificationClient';
+import { httpClient } from '../api/httpClient';
 
 const Header = () => {
     const [showNotifications, setShowNotifications] = useState(false);
@@ -19,10 +20,7 @@ const Header = () => {
 
 
     useEffect(() => {
-        fetch("/api/auth/roleinfo", {
-            credentials: "include"
-        })
-            .then(res => res.json())
+        httpClient.get("/api/auth/roleinfo")
             .then(data => {
                 if (data.roleName === "ROLE_ADMIN") setIsAdmin(true);
             })
@@ -33,18 +31,10 @@ const Header = () => {
     // ✅ 사용자 인증 상태 확인
     const checkAuth = async () => {
         try {
-            console.log('Header: 사용자 인증 상태 확인 중...'); // 디버깅
-
-            const response = await fetch('http://localhost:8080/api/auth/mypage', {
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                const userData = await response.json();
-                console.log('Header: 받아온 사용자 데이터:', userData); // 디버깅
-
+            const authResult = await checkAuthStatus();
+            if (authResult.isAuthenticated) {
                 setIsLoggedIn(true);
-                setUserInfo(userData);
+                setUserInfo(authResult.user);
             } else {
                 setIsLoggedIn(false);
                 setUserInfo(null);
@@ -93,10 +83,7 @@ const Header = () => {
     // ✅ 마우스 오버 시 해당 알림 읽음 처리 (호버 기반)
     const handleMarkAsRead = async (id) => {
         try {
-            await fetch(`/api/notifications/${id}/read`, {
-                method: 'POST',
-                credentials: 'include'
-            });
+            await httpClient.post(`/api/notifications/${id}/read`);
 
             setNotifications((prev) =>
                 prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
@@ -111,11 +98,7 @@ const Header = () => {
         if (!isLoggedIn) return;
         setNotificationsStatus('loading');
         try {
-            const res = await fetch('/api/notifications/get', { credentials: 'include' });
-            if (!res.ok) {
-                throw new Error(`알림 조회 실패 (HTTP ${res.status})`);
-            }
-            const data = await res.json();
+            const data = await httpClient.get('/api/notifications/get');
             const unread = (Array.isArray(data) ? data : []).filter((n) => !n.isRead);
             setNotifications(unread);
             setNotificationsStatus('ready');
@@ -129,11 +112,7 @@ const Header = () => {
     const loadUnreadCount = useCallback(async () => {
         if (!isLoggedIn) return;
         try {
-            const res = await fetch('/api/notifications/count/unread', { credentials: 'include' });
-            if (!res.ok) {
-                throw new Error(`알림 수 조회 실패 (HTTP ${res.status})`);
-            }
-            const count = await res.json();
+            const count = await httpClient.get('/api/notifications/count/unread');
             setUnreadCount(Number.isFinite(Number(count)) ? Number(count) : 0);
         } catch (err) {
             console.error('알림 수 불러오기 실패', err);

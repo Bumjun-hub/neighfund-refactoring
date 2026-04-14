@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { checkAuthStatus, refreshToken } from './authUtils';
+import { httpClient } from '../api/httpClient';
 
 const AuthContext = createContext();
 
@@ -78,30 +79,18 @@ export const AuthProvider = ({ children }) => {
     // 로그인 함수
     const login = async (email, password) => {
         try {
-            const response = await fetch('http://localhost:8080/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({ email, password }),
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
+            const data = await httpClient.post('/api/auth/login', { email, password });
+            if (data) {
                 await checkAuth();
                 return {
                     success: true,
                     message: data.message,
                     accessToken: data.accessToken // ✅ 로그인 결과로 받은 토큰 전달
                 };
-            } else {
-                return { success: false, message: data.message || '로그인에 실패했습니다.' };
             }
         } catch (error) {
             console.error('로그인 오류:', error);
-            return { success: false, message: '서버 연결에 실패했습니다.' };
+            return { success: false, message: error?.data?.message || error?.message || '서버 연결에 실패했습니다.' };
         }
     };
 
@@ -110,10 +99,7 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             // 서버에 로그아웃 요청
-            await fetch('http://localhost:8080/api/auth/logout', {
-                method: 'POST',
-                credentials: 'include',
-            });
+            await httpClient.post('/api/auth/logout');
             console.log('서버 로그아웃 완료');
         } catch (error) {
             console.error('로그아웃 API 오류:', error);

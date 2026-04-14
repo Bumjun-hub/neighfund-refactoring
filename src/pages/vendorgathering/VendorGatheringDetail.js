@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, MapPin, CreditCard, User, Phone, Mail, CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
 import './VendorGatheringDetail.css';
+import { createVendorReservation, getVendorClassDetail } from './vendorGatheringApi';
 
 const VendorGatheringDetail = ({ gatheringId, onBack }) => {
   const [gathering, setGathering] = useState(null);
@@ -72,18 +73,7 @@ const VendorGatheringDetail = ({ gatheringId, onBack }) => {
     const fetchGatheringDetail = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/gatherings/vendor/detail/${gatheringId}`, {
-          credentials: 'include', // 쿠키 포함
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch gathering details');
-        }
-        
-        const data = await response.json();
+        const data = await getVendorClassDetail(gatheringId);
         
         setGathering({
           id: data.id,
@@ -170,22 +160,8 @@ const VendorGatheringDetail = ({ gatheringId, onBack }) => {
     };
 
     try {
-      const response = await fetch(`/api/gatherings/vendor/reservation/${gatheringId}`, {
-        method: 'POST',
-        credentials: 'include', // 쿠키 포함
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(reservationData)
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || '예약 처리 중 오류가 발생했습니다.');
-      }
-      
-      const result = await response.text();
-      alert(result); // "원데이클래스가 예약되었습니다." 메시지
+      const result = await createVendorReservation(gatheringId, reservationData);
+      alert(result || "원데이클래스가 예약되었습니다."); // "원데이클래스가 예약되었습니다." 메시지
       setShowReservationForm(false);
       
       // 폼 초기화
@@ -199,13 +175,7 @@ const VendorGatheringDetail = ({ gatheringId, onBack }) => {
       
       // 에러 메시지 파싱
       let errorMessage = '예약 중 오류가 발생했습니다.';
-      try {
-        const errorObj = JSON.parse(error.message);
-        errorMessage = errorObj.message || errorMessage;
-      } catch (parseError) {
-        // JSON 파싱 실패시 원본 메시지 사용
-        errorMessage = error.message || errorMessage;
-      }
+      errorMessage = error?.data?.message || error?.message || errorMessage;
       
       alert(errorMessage);
     }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { updateVendorGatheringDetails } from './vendorGatheringApi';
 
 const ClassInfoInputPage2 = () => {
   const [formData, setFormData] = useState({
@@ -111,14 +112,7 @@ const ClassInfoInputPage2 = () => {
         });
       }
       
-      const updateResponse = await fetch(`/api/gatherings/vendor/${gatheringId}/updateDetails`, {
-        method: 'POST',
-        body: updateFormData,
-      });
-      
-      if (!updateResponse.ok) {
-        throw new Error('세부 정보 저장 실패');
-      }
+      await updateVendorGatheringDetails(gatheringId, updateFormData);
       
       alert('세부 정보가 성공적으로 저장되었습니다. 관리자의 승인을 기다려 주십시오');
       

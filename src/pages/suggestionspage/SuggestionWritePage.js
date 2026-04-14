@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import './SuggestionWritePage.css';
 import Section from '../../components/Section';
-import { refreshToken } from '../../utils/authUtils';
+import { authenticatedFetch } from '../../utils/authUtils';
 
 const SuggestionWritePage = () => {
   const [currentUser, setCurrentUser] = useState("");
@@ -41,14 +41,7 @@ const SuggestionWritePage = () => {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        let res = await fetch("/api/auth/roleinfo", { credentials: "include" });
-
-        if (res.status === 401) {
-          const refreshed = await refreshToken();
-          if (refreshed) {
-            res = await fetch("/api/auth/roleinfo", { credentials: "include" });
-          }
-        }
+        const res = await authenticatedFetch("/api/auth/roleinfo", { method: 'GET' });
 
         if (res.ok) {
           const data = await res.json();
@@ -70,11 +63,10 @@ const SuggestionWritePage = () => {
   // ✅ 수정 모드일 때 기존 글 불러오기
   useEffect(() => {
     if (isEdit && currentUserLoaded) {
-      fetch(`/api/community/detail/${id}`, {
-        credentials: 'include',
-      })
-        .then(res => res.json())
-        .then(post => {
+      (async () => {
+        try {
+          const res = await authenticatedFetch(`/api/community/detail/${id}`, { method: 'GET' });
+          const post = await res.json();
           console.log("✅ 수정 대상 게시글:", post);
           if (post.wtiterId !== currentUser) {
             alert("작성자만 수정할 수 있습니다.");
@@ -87,11 +79,11 @@ const SuggestionWritePage = () => {
             category: post.category,
             locationName: post.locationName || '',
           });
-        })
-        .catch(err => {
+        } catch (err) {
           console.error('수정글 로딩 실패:', err);
           alert('게시글 데이터를 불러오지 못했습니다.');
-        });
+        }
+      })();
     }
   }, [id, isEdit, currentUser, currentUserLoaded, navigate]);
 
@@ -114,13 +106,9 @@ const SuggestionWritePage = () => {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
-      const res = await fetch(url, {
+      const res = await authenticatedFetch(url, {
         method,
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+        body: payload,
       });
 
       if (res.ok) {
@@ -140,9 +128,8 @@ const SuggestionWritePage = () => {
     if (!window.confirm('정말로 삭제하시겠습니까?')) return;
 
     try {
-      const res = await fetch(`/api/community/delete/${id}`, {
+      const res = await authenticatedFetch(`/api/community/delete/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       if (res.ok) {

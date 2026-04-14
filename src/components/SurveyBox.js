@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import './SurveyBox.css';
-import { refreshToken } from '../utils/authUtils';
+import { authenticatedFetch } from '../utils/authUtils';
 
 const SurveyBox = ({ question, options, surveyId, voted, showResult, totalCount, surveys, setSurveys }) => {
   const [selected, setSelected] = useState(null);
@@ -27,22 +27,9 @@ const SurveyBox = ({ question, options, surveyId, voted, showResult, totalCount,
     setVoteError('');
     setIsVoting(true);
     try {
-      let res = await fetch(`/api/survey/${surveyId}/vote?optionId=${options[optionIndex].optionId}`, {
+      const res = await authenticatedFetch(`/api/survey/${surveyId}/vote?optionId=${options[optionIndex].optionId}`, {
         method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
       });
-
-      if (res.status === 401) {
-        const refreshed = await refreshToken();
-        if (refreshed) {
-          res = await fetch(`/api/survey/${surveyId}/vote?optionId=${options[optionIndex].optionId}`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-      }
 
       if (res.ok) {
         const data = await res.json(); // { options: [...], totalParticipants }

@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import './VendorAdminPage.css';
+import {
+  approveVendorGathering,
+  deleteVendorGathering,
+  getVendorAdminGatherings,
+  getVendorAdminReservations,
+  rejectVendorGathering,
+  updateVendorReservationStatus,
+} from './vendorGatheringApi';
 
 // 메인 컴포넌트
 const VendorAdminPage = () => {
@@ -18,22 +26,7 @@ const VendorAdminPage = () => {
     setLoading(true);
     setTabError((prev) => ({ ...prev, gatherings: '' }));
     try {
-      const response = await fetch('/api/gatherings/vendor/admin/vendor-gatherings', {
-        credentials: 'include', // 쿠키 포함
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (response.status === 403) {
-        setGatherings([]);
-        setTabError((prev) => ({ ...prev, gatherings: '관리자 권한이 필요합니다.' }));
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`목록 조회 실패 (HTTP ${response.status})`);
-      }
-      
-      const data = await response.json();
+      const data = await getVendorAdminGatherings();
       
       if (Array.isArray(data)) {
         setGatherings(data);
@@ -43,6 +36,10 @@ const VendorAdminPage = () => {
     } catch (error) {
       console.error('데이터 로딩 실패:', error);
       setGatherings([]);
+      if (error?.status === 403) {
+        setTabError((prev) => ({ ...prev, gatherings: '관리자 권한이 필요합니다.' }));
+        return;
+      }
       setTabError((prev) => ({ ...prev, gatherings: '원데이클래스 목록을 불러오지 못했습니다.' }));
     } finally {
       setLoading(false);
@@ -53,22 +50,7 @@ const VendorAdminPage = () => {
     setLoading(true);
     setTabError((prev) => ({ ...prev, reservations: '' }));
     try {
-      const response = await fetch('/api/gatherings/vendor/admin/reservations', {
-        credentials: 'include', // 쿠키 포함
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (response.status === 403) {
-        setReservations([]);
-        setTabError((prev) => ({ ...prev, reservations: '관리자 권한이 필요합니다.' }));
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`예약 조회 실패 (HTTP ${response.status})`);
-      }
-      
-      const data = await response.json();
+      const data = await getVendorAdminReservations();
       
       if (Array.isArray(data)) {
         setReservations(data);
@@ -78,6 +60,10 @@ const VendorAdminPage = () => {
     } catch (error) {
       console.error('예약 데이터 로딩 실패:', error);
       setReservations([]);
+      if (error?.status === 403) {
+        setTabError((prev) => ({ ...prev, reservations: '관리자 권한이 필요합니다.' }));
+        return;
+      }
       setTabError((prev) => ({ ...prev, reservations: '예약 데이터를 불러오지 못했습니다.' }));
     } finally {
       setLoading(false);
@@ -153,38 +139,31 @@ const GatheringManagement = ({ gatherings, onRefresh }) => {
 
   const handleApprove = async (id) => {
     try {
-      const response = await fetch(`/api/gatherings/vendor/admin/vendor-gatherings/${id}/approve`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (response.ok) {
-        alert('승인되었습니다.');
-        onRefresh();
-      } else if (response.status === 403) {
+      await approveVendorGathering(id);
+      alert('승인되었습니다.');
+      onRefresh();
+    } catch (error) {
+      if (error?.status === 403) {
         alert('관리자 권한이 필요합니다.');
       }
-    } catch (error) {
-      alert('승인 실패');
+      else {
+        alert('승인 실패');
+      }
     }
   };
 
   const handleReject = async (id) => {
     if (window.confirm('정말 거절하시겠습니까?')) {
       try {
-        const response = await fetch(`/api/gatherings/vendor/admin/vendor-gatherings/${id}/reject`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        if (response.ok) {
-          alert('거절되었습니다.');
-          onRefresh();
-        } else if (response.status === 403) {
-          alert('관리자 권한이 필요합니다.');
-        }
+        await rejectVendorGathering(id);
+        alert('거절되었습니다.');
+        onRefresh();
       } catch (error) {
-        alert('거절 실패');
+        if (error?.status === 403) {
+          alert('관리자 권한이 필요합니다.');
+        } else {
+          alert('거절 실패');
+        }
       }
     }
   };
@@ -193,41 +172,22 @@ const GatheringManagement = ({ gatherings, onRefresh }) => {
   const handleDelete = async (id, title) => {
     if (window.confirm(`'${title}' 클래스를 정말 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.`)) {
       try {
-        const response = await fetch(`/api/gatherings/vendor/gathering/${id}`, {
-          method: 'DELETE',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
+        const result = await deleteVendorGathering(id);
+        if (result) {
           alert(result.message || '원데이클래스가 삭제되었습니다.');
-          onRefresh();
-        } else if (response.status === 403) {
-          alert('관리자 권한이 필요합니다.');
-        } else if (response.status === 404) {
-          alert('해당 클래스를 찾을 수 없습니다.');
-        } else if (response.status === 409) {
-          // 409 Conflict 에러 처리
-          try {
-            const errorData = await response.json();
-            alert(`삭제할 수 없습니다: ${errorData.message || '이미 예약이 있거나 진행 중인 클래스입니다.'}`);
-          } catch {
-            const errorText = await response.text();
-            alert(`삭제할 수 없습니다: ${errorText || '이미 예약이 있거나 진행 중인 클래스입니다.'}`);
-          }
-        } else {
-          try {
-            const errorData = await response.json();
-            alert(`삭제 실패: ${errorData.message || '알 수 없는 오류가 발생했습니다.'}`);
-          } catch {
-            const errorText = await response.text();
-            alert(`삭제 실패: ${errorText || '서버 오류가 발생했습니다.'}`);
-          }
         }
+        onRefresh();
       } catch (error) {
+        if (error?.status === 403) {
+          alert('관리자 권한이 필요합니다.');
+        } else if (error?.status === 404) {
+          alert('해당 클래스를 찾을 수 없습니다.');
+        } else if (error?.status === 409) {
+          alert(`삭제할 수 없습니다: ${error?.data?.message || '이미 예약이 있거나 진행 중인 클래스입니다.'}`);
+        } else {
+          alert(`삭제 실패: ${error?.data?.message || error?.message || '서버 오류가 발생했습니다.'}`);
+        }
         console.error('삭제 실패:', error);
-        alert('네트워크 오류로 삭제에 실패했습니다.');
       }
     }
   };
@@ -388,34 +348,19 @@ const ReservationManagement = ({ reservations, onRefresh }) => {
   const handleStatusUpdate = async (reservationId, newStatus) => {
     try {
       console.log(`상태 변경 시도: 예약 ID ${reservationId}, 새 상태: ${newStatus}`);
-      
-      const response = await fetch(`/api/gatherings/vendor/admin/reservations/${reservationId}/status`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-      
-      if (response.ok) {
-        const message = await response.text();
-        console.log('응답 메시지:', message);
-        alert('상태가 변경되었습니다.');
-        onRefresh();
-      } else if (response.status === 403) {
-        alert('관리자 권한이 필요합니다.');
-      } else if (response.status === 400) {
-        const errorMessage = await response.text();
-        alert(`잘못된 요청: ${errorMessage}`);
-      } else {
-        const errorMessage = await response.text();
-        alert(`상태 변경에 실패했습니다: ${errorMessage}`);
-        console.error('API 응답 에러:', response.status, errorMessage);
-      }
+      const message = await updateVendorReservationStatus(reservationId, newStatus);
+      console.log('응답 메시지:', message);
+      alert('상태가 변경되었습니다.');
+      onRefresh();
     } catch (error) {
-      console.error('상태 변경 실패:', error);
-      alert('네트워크 오류로 상태 변경에 실패했습니다.');
+      if (error?.status === 403) {
+        alert('관리자 권한이 필요합니다.');
+      } else if (error?.status === 400) {
+        alert(`잘못된 요청: ${error?.data?.message || error?.message}`);
+      } else {
+        alert(`상태 변경에 실패했습니다: ${error?.data?.message || error?.message}`);
+        console.error('API 응답 에러:', error?.status, error?.message);
+      }
     }
   };
 

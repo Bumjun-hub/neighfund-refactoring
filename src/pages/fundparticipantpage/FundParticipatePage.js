@@ -3,6 +3,7 @@ import FundParticipateBankStep from "./FundParticipateBankStep";
 import FundParticipateInfoStep from "./FundParticipateInfoStep";
 import FundParticipateNoticeStep from "./FundParticipateNoticeStep";
 import './FundParticipatePage.css';
+import { getFundDetail } from "../fundpage/fundApi";
 
 const FundParticipatePage = ({ fundId, optionId, rewardTitle, rewardAmount }) => {
   const [step, setStep] = useState(1);
@@ -29,12 +30,7 @@ const FundParticipatePage = ({ fundId, optionId, rewardTitle, rewardAmount }) =>
     setLoadState("loading");
     setFund(null);
     try {
-      const res = await fetch(`/api/fund/view/${fundId}`);
-      if (!res.ok) {
-        setLoadState("error");
-        return;
-      }
-      const data = await res.json();
+      const data = await getFundDetail(fundId);
       if (!data || typeof data !== "object") {
         setLoadState("error");
         return;

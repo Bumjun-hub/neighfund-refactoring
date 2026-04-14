@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './ClassInfoInputPage.css';
+import { createVendorGathering } from './vendorGatheringApi';
 
 const ClassInfoInputPage = () => {
   const [formData, setFormData] = useState({
@@ -93,16 +94,7 @@ const ClassInfoInputPage = () => {
       }
       
       console.log('기본 정보 저장 중...');
-      const createResponse = await fetch('/api/gatherings/vendor/create', {
-        method: 'POST',
-        body: formDataToSend,
-      });
-      
-      if (!createResponse.ok) {
-        throw new Error('기본 정보 저장 실패');
-      }
-      
-      const result = await createResponse.json();
+      const result = await createVendorGathering(formDataToSend);
       console.log('저장 성공:', result);
       
       // gatheringId를 localStorage에 저장
